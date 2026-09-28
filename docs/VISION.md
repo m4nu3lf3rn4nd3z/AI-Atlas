@@ -105,13 +105,26 @@ coste y latencia, OWASP LLM Top 10, A2A, computer use, agentes de código y los 
 **Modo Live (fase 5)**: si Ollama está en marcha en `localhost:11434`, los labs de sampling,
 embeddings, RAG y tool calling podrán usar inferencia real. Todo funciona sin Ollama.
 
-## 9. Fases
+## 9. Módulos añadidos tras la revisión de la fase 1
+
+Tras probar la fase 1, el usuario pidió cuatro cambios que ya están construidos:
+
+| Módulo | Qué es |
+|---|---|
+| **Mapa v2** | Capas de arriba abajo (0 = Fundamentos), plegables, con conexiones dibujadas solo para el concepto señalado. Sustituye al grafo de React Flow. |
+| **Progreso** | Porcentaje global, KPIs, barra por capa con una celda por concepto, «lo que te has dejado», rutas, casos y actividad. |
+| **Casos de uso** | 6 sistemas reales con laboratorio: decisiones de diseño, simulación paso a paso, resultado, coste y lección. Motor genérico en `src/cases`. |
+| **Herramientas** | Catálogo de ~110 frameworks, protocolos, servicios y patrones del ecosistema, enlazado con conceptos y casos. |
+| **Seguridad** | Revisión de arquitectura: 22 superficies en 6 zonas de confianza, 43 técnicas de ataque con mapeo OWASP LLM 2025, trifecta letal, patrones de diseño seguro, checklist de 86 controles, casos reales y marcos. En `src/security`. |
+
+## 10. Fases
 
 | Fase | Contenido | Estado |
 |---|---|---|
 | 0 | Entorno y scaffold | ✓ |
-| 1 | Cimientos: design system, mapa, inspector, rutas, búsqueda, progreso, glosario, capa 0 completa, Tokenizer Lab | ✓ (revisión con el usuario) |
-| 2 | Labs estrella I + contenido de las capas 1, 2 y 4 | |
+| 1 | Cimientos: design system, mapa, inspector, rutas, búsqueda, progreso, glosario, capa 0 completa, Tokenizer Lab | ✓ |
+| 1b | Mapa v2, progreso, casos de uso, herramientas, seguridad | ✓ |
+| 2 | Labs estrella I + contenido de las capas 1, 2 y 4 | en curso |
 | 3 | Tool calling, MCP, Agent Graph, **Anatomía de una petición** + capas 3, 5 y 6 | |
 | 4 | Prompt injection, Evals, Contexto, Decisión + capa 7, rutas y glosario completos | |
 | 5 | Modo Live con Ollama, auditoría de a11y, móvil y rendimiento, e2e con Playwright | |

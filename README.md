@@ -40,12 +40,15 @@ a Node.js conexiones entrantes. Para probar el build de producción: `npm run bu
 
 ## Qué hay dentro
 
-- **Mapa**: 53 conceptos en 8 capas, con relaciones tipadas. Pasa el ratón para ver conexiones;
-  «¿Qué necesito antes?» muestra la cadena de prerrequisitos.
+- **Mapa**: 53 conceptos en 8 capas, de Fundamentos (arriba) a Producción. Señala un concepto
+  para ver sus conexiones; «¿Qué necesito antes?» muestra la cadena de prerrequisitos.
 - **Inspector**: Entender · Código · Lab · Comprueba, en un panel lateral o a página completa.
-- **Rutas**: recorridos guiados por prerrequisitos.
-- **Labs**: Tokenizer (disponible); el resto llega por fases.
-- **Glosario**, **búsqueda** (Ctrl K) y **progreso** (se guarda en tu navegador).
+- **Seguridad**: revisión de arquitectura con superficies de ataque, técnicas de ataque (OWASP LLM
+  2025), patrones de diseño seguro y un checklist exportable.
+- **Casos de uso**: 6 sistemas reales con laboratorio de decisiones de diseño, coste y latencia.
+- **Herramientas**: catálogo del ecosistema (frameworks, protocolos, bases vectoriales, gateways…).
+- **Labs**: calculan de verdad en tu navegador; se van añadiendo por fases.
+- **Rutas**, **glosario**, **búsqueda** (Ctrl K) y **progreso** (se guarda en tu navegador).
 
 ## Documentación
 
