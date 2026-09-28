@@ -1,0 +1,75 @@
+Un modelo de 70B parámetros en BF16 ocupa unos 140 GB solo en pesos: no cabe en ninguna GPU de consumo. La <Term id="quantization">cuantización</Term> guarda cada peso con menos bits (8, 4 o incluso menos) y reduce la memoria a la mitad o a un cuarto. Como la generación está limitada por la velocidad a la que se leen los pesos, también la acelera casi en la misma proporción. El precio es algo de precisión.
+
+## La cuenta que tienes que saber hacer
+
+```
+memoria ≈ parámetros × bits por peso ÷ 8   +   KV cache   +   runtime
+```
+
+| Modelo | BF16 (16 bits) | Q8_0 (8,5) | Q4_K_M (≈4,9) |
+|---|---|---|---|
+| Llama 3.1 8B | 15 GB | 8 GB | 4,6 GB |
+| Qwen3 32B | 61 GB | 32 GB | 19 GB |
+| Llama 3.3 70B | 131 GB | 70 GB | 40 GB |
+
+Regla rápida: **2 GB por cada mil millones de parámetros en BF16, 1 GB en 8 bits y algo más de 0,6 GB en 4 bits**. A eso súmale el <Term id="kv-cache">KV cache</Term>, que crece con el contexto y con cada usuario simultáneo (lo explica <Concept id="context-window">ventana de contexto</Concept>), y un margen para el runtime.
+
+<Callout type="insight" title="Por qué cuantizar también acelera">
+En la fase de <Term id="decode">decode</Term>, para generar cada token hay que leer de memoria todos los pesos que se usan. Una RTX 4090 mueve unos 1.000 GB/s: con 16 GB de pesos el techo teórico ronda los 60 tokens/s; con 4,6 GB en Q4 sube a más de 200 (en la práctica se alcanza un 60–80 % de ese techo). Menos bytes que leer, más tokens por segundo.
+</Callout>
+
+## Cómo funciona
+
+Los pesos de una red son números reales en un rango estrecho (típicamente ±0,05). Cuantizar a enteros de *b* bits consiste en elegir una **escala** *s*, guardar cada peso como el entero más cercano a *w / s* y, al usarlo, reconstruirlo como *q × s*.
+
+<Diagram name="quant-grid" caption="Los mismos pesos redondeados a la rejilla más cercana. Con 4 bits el error es pequeño; con 2 bits casi todo cae en −máx, 0 o +máx." />
+
+Tres decisiones determinan la calidad:
+
+- **Bits**: cada bit menos duplica el tamaño del escalón. La relación señal/ruido cae unos 6 dB por bit.
+- **Granularidad de la escala**: una escala para todo el tensor es barata, pero un solo valor extremo (outlier) estira la rejilla y deja al resto con muy pocos niveles. Por eso los formatos reales usan una escala por **grupo** de 32–128 pesos: Q4_0 y Q8_0 usan bloques de 32; AWQ y GPTQ, grupos de 128. Cada escala cuesta bits extra, y por eso Q8_0 son 8,5 bits por peso y no 8.
+- **Rejilla simétrica o asimétrica**: la simétrica centra la rejilla en cero; la asimétrica añade un punto cero para aprovechar todo el rango cuando los valores no están centrados, a cambio de guardar un número más por grupo.
+
+## No todas las cuantizaciones son iguales
+
+| Qué se cuantiza | Para qué | Ejemplos |
+|---|---|---|
+| Solo los pesos | Que el modelo quepa y el decode vaya más rápido. Lo habitual en local y con pocos usuarios | GGUF (Q4_K_M, Q8_0), AWQ, GPTQ, NF4 de bitsandbytes |
+| Pesos y activaciones | Usar las unidades de 8 o 4 bits de la GPU para calcular más rápido con mucho tráfico | FP8 (W8A8) en Hopper y Blackwell, NVFP4, INT8 con SmoothQuant |
+| El KV cache | Contextos largos o muchos usuarios simultáneos | FP8 en vLLM, q8_0 y q4_0 en llama.cpp y Ollama |
+| Durante el entrenamiento | Que el modelo aprenda a tolerar pocos bits (QAT) | gpt-oss se publica con los expertos en MXFP4; Gemma 3 tiene variantes QAT |
+
+Y no todos los métodos redondean a ciegas:
+
+- **RTN** (*round-to-nearest*): redondear cada peso por separado. Rápido y sin datos; funciona bien a 8 bits.
+- **GPTQ** (2022): cuantiza columna a columna y corrige el error de cada peso ajustando los que faltan, usando unos cientos de ejemplos de calibración.
+- **AWQ** (2023): detecta los canales que más pesan en las activaciones y los protege escalándolos antes de cuantizar.
+- **k-quants e i-quants de llama.cpp**: mezclan precisiones por tensor (más bits para los más sensibles) y pueden usar una *importance matrix* calculada con texto de calibración.
+
+<Callout type="note" title="GGUF no es un tipo de cuantización">
+GGUF es un formato de fichero: puede contener pesos en BF16, Q8_0 o Q4_K_M. El nombre de la cuantización va en el nombre del fichero (`modelo-Q4_K_M.gguf`). Lo explica <Concept id="weight-formats">formatos de pesos</Concept>.
+</Callout>
+
+## Qué se pierde
+
+- **8 bits** (Q8_0, FP8): pérdida prácticamente inapreciable.
+- **5–6 bits**: muy difícil de distinguir del original.
+- **4 bits** con un buen método: pérdida pequeña; es el punto dulce en local.
+- **Por debajo de 4 bits**: la degradación se acelera, sobre todo en modelos pequeños.
+
+La pérdida no se reparte igual. Los modelos grandes toleran mejor la cuantización que los pequeños, y las tareas exigentes (matemáticas, código, contextos largos, idiomas con menos datos de entrenamiento) suelen notarla antes que un benchmark general. Las métricas habituales son la <Term id="perplexity">perplejidad</Term> y la divergencia KL respecto al modelo original, pero la que cuenta es la de tus <Concept id="evals">evals</Concept>.
+
+<Callout type="tradeoff" title="Más grande y cuantizado suele ganar">
+Con la misma memoria, un modelo más grande en 4 bits suele rendir mejor que uno más pequeño en 16 bits: Dettmers y Zettlemoyer (2022) encontraron que 4 bits es casi siempre la precisión óptima para un presupuesto de memoria dado. Por debajo de 4 bits la regla deja de cumplirse.
+</Callout>
+
+## En la práctica
+
+<Steps>
+  <Step title="En local, empieza por Q4_K_M">Si te sobra memoria, sube a Q5_K_M, Q6_K o Q8_0. Si no te cabe, prueba un modelo más pequeño antes que bajar de 4 bits.</Step>
+  <Step title="Reserva memoria para el contexto">Un 8B en Q4 ocupa 4,6 GB, pero con 128k tokens de contexto el KV cache añade 16 GB. Cuantizar el KV cache a 8 bits lo reduce a la mitad.</Step>
+  <Step title="En servidor, FP8 primero">En GPUs Hopper, Ada o Blackwell, FP8 reduce la memoria a la mitad con una pérdida mínima. AWQ o GPTQ en 4 bits ahorran más si la memoria manda.</Step>
+  <Step title="Mide con tus datos">Compara la versión cuantizada con la original en tus propios casos antes de desplegar.</Step>
+</Steps>
+
+Calcula cuánto ocupa cada modelo en tu hardware y mira qué pasa al redondear pesos reales en la pestaña **Lab**.

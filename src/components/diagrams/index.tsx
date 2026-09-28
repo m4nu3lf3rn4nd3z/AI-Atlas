@@ -4,6 +4,7 @@ import { KvCacheDiagram } from './KvCache'
 import { LostInMiddleDiagram } from './LostInMiddle'
 import { MoeDiagram } from './Moe'
 import { PipelineDiagram } from './Pipeline'
+import { QuantGridDiagram } from './QuantGrid'
 import { ReasoningDiagram } from './Reasoning'
 import { TrainingDiagram } from './Training'
 
@@ -16,4 +17,5 @@ export const DIAGRAMS = {
   moe: MoeDiagram,
   reasoning: ReasoningDiagram,
   'embedding-space': EmbeddingSpaceDiagram,
+  'quant-grid': QuantGridDiagram,
 }

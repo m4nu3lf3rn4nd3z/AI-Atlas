@@ -66,11 +66,12 @@ export const LABS: readonly LabInfo[] = [
   {
     id: 'vram',
     title: 'VRAM y cuantización',
-    short: '¿Cabe este modelo en tu GPU? Pesos, KV cache y el error de cuantizar.',
+    short: '¿Cabe este modelo en tu GPU? Pesos, KV cache, velocidad y el error de cuantizar.',
     concept: 'quantization',
     reality: 'real',
-    realityNote: 'Cálculo real con configuraciones de modelos reales.',
+    realityNote: 'Cálculo real con las arquitecturas publicadas de cada modelo y pesos reales de Qwen2.5 para la cuantización.',
     phase: 2,
+    Component: lazy(() => import('./vram/VramLab')),
   },
   {
     id: 'context',

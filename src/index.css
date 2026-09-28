@@ -39,6 +39,10 @@
   --l6: #c026d3;
   --l7: #e11d48;
 
+  /* Two-series categorical pair for lab charts (validated: CVD ΔE ≥ 25). */
+  --chart-1: #2563eb;
+  --chart-2: #ea580c;
+
   color-scheme: light;
 }
 
@@ -73,6 +77,9 @@
   --l6: #e879f9;
   --l7: #fb7185;
 
+  --chart-1: #4f95f0;
+  --chart-2: #d86c24;
+
   color-scheme: dark;
 }
 
@@ -95,6 +102,8 @@
   --color-prog-0: var(--prog-0);
   --color-prog-1: var(--prog-1);
   --color-prog-2: var(--prog-2);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
 
   --font-sans: 'Geist Variable', ui-sans-serif, system-ui, sans-serif;
   --font-mono: 'Geist Mono Variable', ui-monospace, 'Cascadia Code', monospace;
