@@ -117,6 +117,15 @@
   }
 }
 
+/* iOS Safari zooms into inputs with font-size < 16px when they get focus. */
+@supports (-webkit-touch-callout: none) {
+  input,
+  textarea,
+  select {
+    font-size: max(16px, 1em) !important;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

@@ -4,6 +4,7 @@ import { useCallback, useEffect } from 'react'
 import { useSearchParams } from 'react-router'
 import { getConcept } from '@/content'
 import { useMediaQuery } from '@/lib/hooks'
+import { useUi } from '@/stores/ui'
 import { isConceptTab, type ConceptTab } from '../concept/tabs'
 import { AtlasCanvas } from './AtlasCanvas'
 import { InspectorDrawer } from './InspectorDrawer'
@@ -40,14 +41,15 @@ export default function MapPage() {
       }),
     [update],
   )
-  const close = useCallback(
-    () =>
-      update((p) => {
-        p.delete('c')
-        p.delete('tab')
-      }),
-    [update],
-  )
+  const setHovered = useUi((s) => s.setHovered)
+  const close = useCallback(() => {
+    // Touch screens never fire mouseleave, so a tapped node would stay "hovered".
+    setHovered(null)
+    update((p) => {
+      p.delete('c')
+      p.delete('tab')
+    })
+  }, [update, setHovered])
 
   useEffect(() => {
     if (!selected) return

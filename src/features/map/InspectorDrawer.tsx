@@ -1,5 +1,6 @@
 import { motion } from 'motion/react'
 import { useRef, type PointerEvent } from 'react'
+import { cn } from '@/lib/cn'
 import { useMediaQuery } from '@/lib/hooks'
 import { useUi } from '@/stores/ui'
 import { ConceptView } from '../concept/ConceptView'
@@ -16,11 +17,13 @@ interface Props {
   onClose: () => void
 }
 
-/* Resizable side panel on desktop, full-screen sheet on mobile. */
+/* Resizable side panel on wide screens (it pushes the map), a floating
+   panel over the map on tablets, and a full-screen sheet on phones. */
 export function InspectorDrawer({ id, tab, onTabChange, onNavigate, onClose }: Props) {
   const width = useUi((s) => s.drawerWidth)
   const setWidth = useUi((s) => s.setDrawerWidth)
   const narrow = useMediaQuery('(max-width: 767px)')
+  const overlay = useMediaQuery('(max-width: 1023px)')
   const dragging = useRef(false)
 
   const onPointerDown = (e: PointerEvent) => {
@@ -43,11 +46,15 @@ export function InspectorDrawer({ id, tab, onTabChange, onNavigate, onClose }: P
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: 24 }}
       transition={{ duration: 0.22, ease: [0.2, 0.8, 0.2, 1] }}
-      className="relative z-20 flex h-full shrink-0 flex-col border-l border-border bg-bg max-md:fixed max-md:inset-0 max-md:top-12"
-      style={{ width: narrow ? '100%' : width }}
+      className={cn(
+        'relative z-20 flex h-full shrink-0 flex-col border-l border-border bg-bg',
+        overlay && 'fixed top-12 right-0 bottom-0 z-40 h-auto shadow-2xl shadow-black/40',
+        narrow && 'left-0',
+      )}
+      style={{ width: narrow ? '100%' : overlay ? 'min(560px, 88vw)' : width }}
       aria-label="Inspector de concepto"
     >
-      {!narrow && (
+      {!overlay && (
         <div
           role="separator"
           aria-orientation="vertical"

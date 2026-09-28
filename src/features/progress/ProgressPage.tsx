@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Card, SectionLabel } from '@/components/ui/primitives'
 import { CONCEPTS, conceptsInLayer, hasContent, WRITTEN_COUNT } from '@/content'
 import { LAYERS } from '@/content/layers'
+import { copyText } from '@/lib/clipboard'
 import { statusOf, useProgress } from '@/stores/progress'
 import { recommendNext } from './recommend'
 
@@ -84,12 +85,13 @@ export default function ProgressPage() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => {
-              navigator.clipboard?.writeText(exportJson).then(
-                () => setMessage('Progreso copiado al portapapeles como JSON.'),
-                () => setMessage('No se pudo copiar.'),
+            onClick={async () =>
+              setMessage(
+                (await copyText(exportJson))
+                  ? 'Progreso copiado al portapapeles como JSON.'
+                  : 'No se pudo copiar en este navegador.',
               )
-            }}
+            }
           >
             <Download /> Copiar como JSON
           </Button>

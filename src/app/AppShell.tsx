@@ -70,7 +70,7 @@ export function AppShell() {
           >
             <Search className="size-3.5 shrink-0" aria-hidden />
             <span className="hidden lg:inline">Buscar conceptos, labs…</span>
-            <Kbd className="ml-auto hidden lg:inline-flex">Ctrl K</Kbd>
+            <Kbd className="ml-auto hidden lg:inline-flex [@media(hover:none)]:!hidden">Ctrl K</Kbd>
           </button>
           <ProgressRing />
           <Tooltip content={theme === 'dark' ? 'Tema claro' : 'Tema oscuro'}>

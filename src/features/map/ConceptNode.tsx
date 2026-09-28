@@ -40,7 +40,7 @@ function ConceptNodeImpl({ data }: NodeProps<ConceptNodeType>) {
         title={concept.short}
         aria-label={`${concept.title}. ${concept.short}`}
         className={cn(
-          'nodrag nopan group flex h-full w-full cursor-pointer flex-col justify-center overflow-hidden rounded-xl border bg-surface pr-3 pl-4 text-left transition-[opacity,box-shadow,border-color,transform] duration-200',
+          'nodrag group flex h-full w-full cursor-pointer flex-col justify-center overflow-hidden rounded-xl border bg-surface pr-3 pl-4 text-left transition-[opacity,box-shadow,border-color,transform] duration-200',
           written ? 'border-border' : 'border-dashed border-border-strong',
           state === 'dim' && 'opacity-25',
           state === 'lit' && 'border-[color-mix(in_oklab,var(--layer)_55%,transparent)]',

@@ -132,7 +132,7 @@ export function MapToolbar({ view, onViewChange, showGraphTools }: Props) {
             </Popover.Portal>
           </Popover.Root>
 
-          <span className="pointer-events-none hidden text-[12px] text-subtle xl:inline">
+          <span className="pointer-events-none hidden text-[12px] text-subtle xl:inline [@media(hover:none)]:!hidden">
             Pasa el ratón por un concepto para ver sus conexiones · clic para abrirlo
           </span>
         </>

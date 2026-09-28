@@ -1,6 +1,7 @@
 import { Check, Copy } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import type { HighlighterCore } from 'shiki/core'
+import { copyText } from '@/lib/clipboard'
 import { cn } from '@/lib/cn'
 
 /* Shiki is loaded on first use with only the grammars we need and the
@@ -78,12 +79,9 @@ export function CodeBlock({
   }, [source, language])
 
   const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(source)
+    if (await copyText(source)) {
       setCopied(true)
       setTimeout(() => setCopied(false), 1500)
-    } catch {
-      /* clipboard blocked: nothing to do */
     }
   }
 

@@ -15,11 +15,23 @@ npm run dev
 
 Abre http://localhost:5173.
 
+### Probar desde otro dispositivo de tu red (iPad, móvil…)
+
+```bash
+npm run dev:lan
+```
+
+Vite muestra la dirección de red (por ejemplo `http://192.168.86.28:5173`). Ábrela en el otro
+dispositivo, conectado a la misma Wi-Fi. Si no carga, revisa que el firewall de Windows permita
+a Node.js conexiones entrantes. Para probar el build de producción: `npm run build` y luego
+`npm run preview:lan` (puerto 4173).
+
 ## Scripts
 
 | Comando | Qué hace |
 |---|---|
 | `npm run dev` | Servidor de desarrollo |
+| `npm run dev:lan` | Servidor de desarrollo accesible desde la red local |
 | `npm run build` | Typecheck + build de producción en `dist/` |
 | `npm run preview` | Sirve el build de producción |
 | `npm test` | Tests de lógica e integridad del contenido |
