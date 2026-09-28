@@ -25,7 +25,7 @@ export default function ConceptPage() {
           Mapa
         </Link>
         <span>/</span>
-        <Link to={`/map?view=list#${layer.id}`} className="hover:text-fg" style={{ color: layer.color }}>
+        <Link to={`/map#${layer.id}`} className="hover:text-fg" style={{ color: layer.color }}>
           {layer.title}
         </Link>
       </nav>

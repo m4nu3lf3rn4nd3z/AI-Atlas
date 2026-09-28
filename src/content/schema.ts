@@ -56,7 +56,7 @@ export type ConceptMeta = z.infer<typeof conceptMetaSchema>
 
 export const snippetSchema = z.object({
   title: z.string(),
-  lang: z.enum(['python', 'typescript', 'bash', 'json']),
+  lang: z.enum(['python', 'typescript', 'bash', 'json', 'sql']),
   code: z.string().min(1),
   /** Pinned versions the snippet was written against. */
   deps: z.record(z.string(), z.string()),

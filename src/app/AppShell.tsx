@@ -1,8 +1,7 @@
-import { Activity, BookText, FlaskConical, Moon, Network, Route, Search, Sun } from 'lucide-react'
-import { Suspense, useEffect } from 'react'
+import { BookText, Briefcase, FlaskConical, Gauge, Moon, Network, Route, Search, Sun, Wrench } from 'lucide-react'
+import { lazy, Suspense, useEffect } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router'
 import { Kbd, Tooltip } from '@/components/ui/primitives'
-import { CommandPalette } from '@/features/search/CommandPalette'
 import { ProgressRing } from '@/features/progress/ProgressRing'
 import { cn } from '@/lib/cn'
 import { useUi } from '@/stores/ui'
@@ -12,14 +11,22 @@ const NAV = [
   { to: '/map', label: 'Mapa', icon: Network },
   { to: '/paths', label: 'Rutas', icon: Route },
   { to: '/labs', label: 'Labs', icon: FlaskConical },
-  { to: '/journey', label: 'Anatomía', icon: Activity },
+  { to: '/cases', label: 'Casos', icon: Briefcase },
+  { to: '/tools', label: 'Herramientas', icon: Wrench },
   { to: '/glossary', label: 'Glosario', icon: BookText },
+  { to: '/progress', label: 'Progreso', icon: Gauge },
 ]
+
+const CommandPalette = lazy(() =>
+  import('@/features/search/CommandPalette').then((m) => ({ default: m.CommandPalette })),
+)
 
 export function AppShell() {
   const theme = useUi((s) => s.theme)
   const setTheme = useUi((s) => s.setTheme)
   const setPaletteOpen = useUi((s) => s.setPaletteOpen)
+  // The palette (and its index of concepts, cases and tools) loads on first use.
+  const paletteLoaded = useUi((s) => s.paletteLoaded)
   const { pathname } = useLocation()
 
   useEffect(() => {
@@ -50,15 +57,19 @@ export function AppShell() {
             <NavLink
               key={to}
               to={to}
+              title={label}
+              aria-label={label}
               className={({ isActive }) =>
                 cn(
-                  'flex h-8 items-center gap-1.5 rounded-md px-2 text-[13px] font-medium text-muted transition-colors hover:bg-surface-2 hover:text-fg md:px-2.5',
+                  'flex h-8 items-center gap-1.5 rounded-md px-2 text-[13px] font-medium text-muted transition-colors hover:bg-surface-2 hover:text-fg lg:px-2.5',
                   isActive && 'bg-surface-2 text-fg',
+                  // On phones the progress ring in the header already links there.
+                  to === '/progress' && 'max-sm:hidden',
                 )
               }
             >
               <Icon className="size-4" aria-hidden />
-              <span className="hidden md:inline">{label}</span>
+              <span className="hidden lg:inline">{label}</span>
             </NavLink>
           ))}
         </nav>
@@ -66,11 +77,12 @@ export function AppShell() {
           <button
             type="button"
             onClick={() => setPaletteOpen(true)}
-            className="flex h-8 cursor-pointer items-center gap-2 rounded-lg border border-border bg-surface px-2.5 text-[13px] whitespace-nowrap text-subtle transition-colors hover:border-border-strong hover:text-muted lg:w-64"
+            aria-label="Buscar"
+            className="flex h-8 cursor-pointer items-center gap-2 rounded-lg border border-border bg-surface px-2.5 text-[13px] whitespace-nowrap text-subtle transition-colors hover:border-border-strong hover:text-muted xl:w-60"
           >
             <Search className="size-3.5 shrink-0" aria-hidden />
-            <span className="hidden lg:inline">Buscar conceptos, labs…</span>
-            <Kbd className="ml-auto hidden lg:inline-flex [@media(hover:none)]:!hidden">Ctrl K</Kbd>
+            <span className="hidden xl:inline">Buscar en el atlas…</span>
+            <Kbd className="ml-auto hidden xl:inline-flex [@media(hover:none)]:!hidden">Ctrl K</Kbd>
           </button>
           <ProgressRing />
           <Tooltip content={theme === 'dark' ? 'Tema claro' : 'Tema oscuro'}>
@@ -90,7 +102,11 @@ export function AppShell() {
           <Outlet />
         </Suspense>
       </main>
-      <CommandPalette />
+      {paletteLoaded && (
+        <Suspense fallback={null}>
+          <CommandPalette />
+        </Suspense>
+      )}
     </div>
   )
 }

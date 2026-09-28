@@ -4,6 +4,8 @@ export interface Layer {
   id: LayerId
   index: number
   title: string
+  /** One-word label for compact navigation. */
+  short: string
   subtitle: string
   /** CSS variable holding the layer hue (theme-aware). */
   color: string
@@ -14,6 +16,7 @@ export const LAYERS: readonly Layer[] = [
     id: 'fundamentals',
     index: 0,
     title: 'Fundamentos',
+    short: 'Fundamentos',
     subtitle: 'Cómo funciona un LLM por dentro',
     color: 'var(--l0)',
   },
@@ -21,6 +24,7 @@ export const LAYERS: readonly Layer[] = [
     id: 'models',
     index: 1,
     title: 'Modelos y ecosistema',
+    short: 'Modelos',
     subtitle: 'Qué modelos existen y cómo elegir',
     color: 'var(--l1)',
   },
@@ -28,6 +32,7 @@ export const LAYERS: readonly Layer[] = [
     id: 'inference',
     index: 2,
     title: 'Inferencia y despliegue',
+    short: 'Inferencia',
     subtitle: 'Ejecutar modelos en local, en servidor y a qué coste',
     color: 'var(--l2)',
   },
@@ -35,6 +40,7 @@ export const LAYERS: readonly Layer[] = [
     id: 'adaptation',
     index: 3,
     title: 'Adaptar el modelo',
+    short: 'Adaptación',
     subtitle: 'Prompting, salidas estructuradas y fine-tuning',
     color: 'var(--l3)',
   },
@@ -42,6 +48,7 @@ export const LAYERS: readonly Layer[] = [
     id: 'knowledge',
     index: 4,
     title: 'Conocimiento y memoria',
+    short: 'Conocimiento',
     subtitle: 'RAG, búsqueda vectorial y memoria de agentes',
     color: 'var(--l4)',
   },
@@ -49,6 +56,7 @@ export const LAYERS: readonly Layer[] = [
     id: 'tools',
     index: 5,
     title: 'Herramientas y protocolos',
+    short: 'Herramientas',
     subtitle: 'Tool calling, MCP y actuar en el mundo',
     color: 'var(--l5)',
   },
@@ -56,6 +64,7 @@ export const LAYERS: readonly Layer[] = [
     id: 'agents',
     index: 6,
     title: 'Agentes y orquestación',
+    short: 'Agentes',
     subtitle: 'Bucles, grafos con estado y multi-agente',
     color: 'var(--l6)',
   },
@@ -63,6 +72,7 @@ export const LAYERS: readonly Layer[] = [
     id: 'production',
     index: 7,
     title: 'Producción',
+    short: 'Producción',
     subtitle: 'Evals, observabilidad, seguridad y coste',
     color: 'var(--l7)',
   },

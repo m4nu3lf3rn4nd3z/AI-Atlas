@@ -9,6 +9,7 @@ const LANG_LABEL: Record<Snippet['lang'], string> = {
   typescript: 'TypeScript',
   bash: 'Shell',
   json: 'JSON',
+  sql: 'SQL',
 }
 
 export function CodeTab({ snippets }: { snippets: Snippet[] }) {

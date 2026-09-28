@@ -7,7 +7,7 @@ import { cn } from '@/lib/cn'
 /* Shiki is loaded on first use with only the grammars we need and the
    JavaScript regex engine (no WASM), then shared by every code block. */
 
-const LANGS = ['python', 'typescript', 'tsx', 'bash', 'json'] as const
+const LANGS = ['python', 'typescript', 'tsx', 'bash', 'json', 'sql'] as const
 type Lang = (typeof LANGS)[number]
 
 let highlighter: Promise<HighlighterCore> | null = null
@@ -29,6 +29,7 @@ function getHighlighter() {
         import('shiki/langs/tsx.mjs'),
         import('shiki/langs/bash.mjs'),
         import('shiki/langs/json.mjs'),
+        import('shiki/langs/sql.mjs'),
       ],
       engine: createJavaScriptRegexEngine(),
     })
@@ -105,7 +106,8 @@ export function CodeBlock({
         {html ? (
           <div dangerouslySetInnerHTML={{ __html: html }} />
         ) : (
-          <pre className="shiki">
+          // Plain text (prompts, messages, logs) wraps; code keeps its lines.
+          <pre className={cn('shiki', language === 'text' && 'break-words whitespace-pre-wrap')}>
             <code>{source}</code>
           </pre>
         )}

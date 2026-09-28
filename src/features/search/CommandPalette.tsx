@@ -1,9 +1,11 @@
 import { Command } from 'cmdk'
-import { ArrowRight, BookText, FlaskConical, Hash, Route } from 'lucide-react'
+import { ArrowRight, BookText, FlaskConical, Hash, Route, Wrench } from 'lucide-react'
 import { Dialog, VisuallyHidden } from 'radix-ui'
 import type { ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router'
+import { CASES } from '@/cases'
 import { CONCEPTS, hasContent } from '@/content'
+import { TOOLS } from '@/content/tools'
 import { GLOSSARY } from '@/content/glossary'
 import { LAYER_BY_ID } from '@/content/layers'
 import { PATHS } from '@/content/paths'
@@ -14,6 +16,8 @@ const PAGES = [
   { to: '/map', label: 'Mapa del ecosistema' },
   { to: '/paths', label: 'Rutas de aprendizaje' },
   { to: '/labs', label: 'Labs' },
+  { to: '/cases', label: 'Casos de uso' },
+  { to: '/tools', label: 'Herramientas del ecosistema' },
   { to: '/journey', label: 'Anatomía de una petición' },
   { to: '/glossary', label: 'Glosario' },
   { to: '/progress', label: 'Mi progreso' },
@@ -75,6 +79,40 @@ export function CommandPalette() {
                     {!hasContent(c.id) && (
                       <span className="shrink-0 font-mono text-[10px] text-subtle">pronto</span>
                     )}
+                  </Command.Item>
+                ))}
+              </Group>
+              <Group heading="Casos de uso">
+                {CASES.map((uc) => (
+                  <Command.Item
+                    key={uc.id}
+                    value={`case:${uc.id}`}
+                    keywords={[uc.title, uc.tagline, ...uc.examples]}
+                    onSelect={() => go(`/cases/${uc.id}`)}
+                    className={itemClass}
+                  >
+                    <uc.icon className="size-4 shrink-0" />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-fg">{uc.title}</span>
+                      <span className="block truncate text-[12px] text-subtle">{uc.tagline}</span>
+                    </span>
+                  </Command.Item>
+                ))}
+              </Group>
+              <Group heading="Herramientas">
+                {TOOLS.map((t) => (
+                  <Command.Item
+                    key={t.id}
+                    value={`tool:${t.id}`}
+                    keywords={[t.name, t.description]}
+                    onSelect={() => go(`/tools#${t.id}`)}
+                    className={itemClass}
+                  >
+                    <Wrench className="size-4 shrink-0" />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-fg">{t.name}</span>
+                      <span className="block truncate text-[12px] text-subtle">{t.description}</span>
+                    </span>
                   </Command.Item>
                 ))}
               </Group>

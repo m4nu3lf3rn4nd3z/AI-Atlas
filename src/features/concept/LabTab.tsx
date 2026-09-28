@@ -1,8 +1,9 @@
 import { FlaskConical, Maximize2 } from 'lucide-react'
-import { Suspense } from 'react'
+import { Suspense, useEffect } from 'react'
 import { Link } from 'react-router'
 import { Badge } from '@/components/ui/primitives'
 import { LAB_BY_ID, REALITY_LABELS, type LabInfo } from '@/labs/registry'
+import { useProgress } from '@/stores/progress'
 
 export function RealityBadge({ lab }: { lab: LabInfo }) {
   const color = lab.reality === 'real' ? 'var(--ok)' : lab.reality === 'mixed' ? 'var(--l2)' : 'var(--warn)'
@@ -15,6 +16,12 @@ export function RealityBadge({ lab }: { lab: LabInfo }) {
 
 export function LabTab({ labId, embedded = true }: { labId?: string; embedded?: boolean }) {
   const lab = labId ? LAB_BY_ID.get(labId) : undefined
+  const markLabUsed = useProgress((s) => s.markLabUsed)
+  const available = !!lab?.Component
+
+  useEffect(() => {
+    if (lab && available) markLabUsed(lab.id)
+  }, [lab, available, markLabUsed])
 
   if (!lab) {
     return (
@@ -33,10 +40,7 @@ export function LabTab({ labId, embedded = true }: { labId?: string; embedded?: 
         <span className="text-[14px] font-semibold">{lab.title}</span>
         <RealityBadge lab={lab} />
         {embedded && Component && (
-          <Link
-            to={`/labs/${lab.id}`}
-            className="ml-auto flex items-center gap-1 text-[12px] text-subtle hover:text-fg"
-          >
+          <Link to={`/labs/${lab.id}`} className="ml-auto flex items-center gap-1 text-[12px] text-subtle hover:text-fg">
             <Maximize2 className="size-3.5" /> Pantalla completa
           </Link>
         )}

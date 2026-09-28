@@ -22,5 +22,5 @@
     }
   },
   "include": ["src"],
-  "exclude": ["src/content/concepts/*/snippets", "src/**/*.test.ts"]
+  "exclude": ["src/content/concepts/*/snippets", "src/cases/data/snippets", "src/**/*.test.ts"]
 }

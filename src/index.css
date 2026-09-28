@@ -1,5 +1,4 @@
 @import 'tailwindcss';
-@import '@xyflow/react/dist/base.css';
 
 @custom-variant dark (&:where(.dark, .dark *));
 
@@ -24,6 +23,12 @@
   --warn: #b45309;
   --bad: #dc2626;
   --grid: #00000010;
+
+  /* Ordinal progress ramp (pending → in progress → learned), validated for
+     monotone lightness and ≥ 2:1 against the surface in both themes. */
+  --prog-0: #b893f5;
+  --prog-1: #9563ef;
+  --prog-2: #6d28d9;
 
   --l0: #7c3aed;
   --l1: #2563eb;
@@ -55,6 +60,10 @@
   --bad: #f87171;
   --grid: #ffffff0b;
 
+  --prog-0: #4d4172;
+  --prog-1: #7a67b6;
+  --prog-2: #a78bfa;
+
   --l0: #a78bfa;
   --l1: #60a5fa;
   --l2: #22d3ee;
@@ -83,6 +92,9 @@
   --color-ok: var(--ok);
   --color-warn: var(--warn);
   --color-bad: var(--bad);
+  --color-prog-0: var(--prog-0);
+  --color-prog-1: var(--prog-1);
+  --color-prog-2: var(--prog-2);
 
   --font-sans: 'Geist Variable', ui-sans-serif, system-ui, sans-serif;
   --font-mono: 'Geist Mono Variable', ui-monospace, 'Cascadia Code', monospace;
@@ -257,31 +269,16 @@
 }
 
 /* ---------------------------------------------------------------
-   React Flow overrides
+   Small motion helpers
 ---------------------------------------------------------------- */
-.react-flow {
-  --xy-background-color: transparent;
-  --xy-edge-stroke: var(--border-strong);
-  --xy-minimap-background-color: var(--surface);
-  --xy-controls-button-background-color: var(--surface);
-  --xy-controls-button-background-color-hover: var(--surface-2);
-  --xy-controls-button-color: var(--fg-muted);
-  --xy-controls-button-border-color: var(--border);
+@keyframes atlas-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
-.react-flow__attribution {
-  display: none;
-}
-.react-flow__controls {
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  overflow: hidden;
-  box-shadow: none;
-}
-.react-flow__minimap {
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  overflow: hidden;
-}
-.react-flow__node {
-  cursor: default;
+.atlas-fade {
+  animation: atlas-fade-in 0.22s ease-out;
 }

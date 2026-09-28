@@ -1,4 +1,6 @@
 import { ArrowRight, CornerDownLeft } from 'lucide-react'
+import { Link } from 'react-router'
+import { casesForConcept } from '@/cases'
 import { CONCEPTS, getConcept, hasContent } from '@/content'
 import { dependents } from '@/content/graph'
 import { LAYER_BY_ID, RELATION_LABELS } from '@/content/layers'
@@ -34,6 +36,7 @@ export function RelationsPanel({ concept, onNavigate }: { concept: ConceptMeta; 
     c.relations.filter((r) => r.to === concept.id).map((r) => ({ from: c.id, type: r.type, note: r.note })),
   )
   const next = dependents(concept.id)
+  const cases = casesForConcept(concept.id)
 
   return (
     <div className="space-y-5">
@@ -76,6 +79,22 @@ export function RelationsPanel({ concept, onNavigate }: { concept: ConceptMeta; 
           <div className="flex flex-wrap gap-1.5">
             {next.map((id) => (
               <Chip key={id} id={id} onNavigate={onNavigate} />
+            ))}
+          </div>
+        </div>
+      )}
+      {cases.length > 0 && (
+        <div>
+          <SectionLabel className="mb-2">Lo verás en acción en</SectionLabel>
+          <div className="flex flex-wrap gap-1.5">
+            {cases.map((uc) => (
+              <Link
+                key={uc.id}
+                to={`/cases/${uc.id}`}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-accent-soft px-2 py-1 text-[12.5px] text-fg hover:underline"
+              >
+                <uc.icon className="size-3.5" /> {uc.title}
+              </Link>
             ))}
           </div>
         </div>

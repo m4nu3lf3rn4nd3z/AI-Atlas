@@ -13,14 +13,19 @@ interface UiState {
   /** Concept currently hovered or keyboard-focused on the map. */
   hovered: string | null
   hiddenEdgeTypes: EdgeType[]
-  hiddenLayers: LayerId[]
+  collapsedLayers: LayerId[]
+  showLines: boolean
   prereqMode: boolean
   paletteOpen: boolean
+  /** True once the palette has been opened (it is loaded lazily). */
+  paletteLoaded: boolean
   setTheme: (t: Theme) => void
   setDrawerWidth: (w: number) => void
   setHovered: (id: string | null) => void
   toggleEdgeType: (t: EdgeType) => void
-  toggleLayer: (l: LayerId) => void
+  toggleCollapsed: (l: LayerId) => void
+  setCollapsed: (layers: LayerId[]) => void
+  setShowLines: (v: boolean) => void
   setPrereqMode: (v: boolean) => void
   setPaletteOpen: (v: boolean) => void
 }
@@ -32,9 +37,11 @@ export const useUi = create<UiState>()(
       drawerWidth: 560,
       hovered: null,
       hiddenEdgeTypes: [],
-      hiddenLayers: [],
+      collapsedLayers: [],
+      showLines: true,
       prereqMode: false,
       paletteOpen: false,
+      paletteLoaded: false,
       setTheme: (theme) => {
         document.documentElement.classList.toggle('dark', theme === 'dark')
         try {
@@ -52,23 +59,29 @@ export const useUi = create<UiState>()(
             ? s.hiddenEdgeTypes.filter((x) => x !== t)
             : [...s.hiddenEdgeTypes, t],
         })),
-      toggleLayer: (l) =>
+      toggleCollapsed: (l) =>
         set((s) => ({
-          hiddenLayers: s.hiddenLayers.includes(l)
-            ? s.hiddenLayers.filter((x) => x !== l)
-            : [...s.hiddenLayers, l],
+          collapsedLayers: s.collapsedLayers.includes(l)
+            ? s.collapsedLayers.filter((x) => x !== l)
+            : [...s.collapsedLayers, l],
         })),
+      setCollapsed: (collapsedLayers) => set({ collapsedLayers }),
+      setShowLines: (showLines) => set({ showLines }),
       setPrereqMode: (prereqMode) => set({ prereqMode }),
-      setPaletteOpen: (paletteOpen) => set({ paletteOpen }),
+      setPaletteOpen: (paletteOpen) => set((s) => ({ paletteOpen, paletteLoaded: s.paletteLoaded || paletteOpen })),
     }),
     {
       name: 'atlas-ui',
+      version: 2,
       partialize: (s) => ({
         theme: s.theme,
         drawerWidth: s.drawerWidth,
         hiddenEdgeTypes: s.hiddenEdgeTypes,
+        collapsedLayers: s.collapsedLayers,
+        showLines: s.showLines,
         prereqMode: s.prereqMode,
       }),
+      migrate: (persisted) => persisted as UiState,
     },
   ),
 )

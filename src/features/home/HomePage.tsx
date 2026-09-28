@@ -1,13 +1,16 @@
-import { Activity, ArrowRight, FlaskConical, Network, Route, Sparkles } from 'lucide-react'
+import { ArrowRight, Briefcase, FlaskConical, Network, Route, Sparkles } from 'lucide-react'
 import type { CSSProperties } from 'react'
 import { Link } from 'react-router'
 import { Button } from '@/components/ui/button'
 import { Card, SectionLabel } from '@/components/ui/primitives'
-import { CONCEPTS, conceptsInLayer, getConcept, hasContent, WRITTEN_COUNT } from '@/content'
-import { LAYER_BY_ID, LAYERS } from '@/content/layers'
+import { CONCEPTS, conceptsInLayer, getConcept, WRITTEN_COUNT } from '@/content'
+import { LAYERS } from '@/content/layers'
+import { CASES } from '@/cases'
+import { TOOLS } from '@/content/tools'
 import { LABS } from '@/labs/registry'
 import { useProgress } from '@/stores/progress'
 import { recommendNext } from '../progress/recommend'
+import { PROGRESS_STYLE, progressState } from '../progress/status'
 
 export default function HomePage() {
   const progress = useProgress((s) => s.concepts)
@@ -79,11 +82,11 @@ export default function HomePage() {
             text={`Tokenizadores reales, softmax real, embeddings reales en tu navegador. ${labsReady} de ${LABS.length} labs disponibles.`}
           />
           <Feature
-            to="/journey"
-            icon={Activity}
-            title="Anatomía de una petición"
+            to="/cases"
+            icon={Briefcase}
+            title="Casos de uso"
             color="var(--l6)"
-            text="Sigue una pregunta real a través de todas las capas y cambia la arquitectura para ver qué cambia. Llega en la fase 3."
+            text={`${CASES.length} sistemas reales (soporte con RAG, agente de código, facturas, copiloto MCP…) con un laboratorio: cambia la arquitectura y mira qué pasa.`}
           />
           <Feature
             to="/paths"
@@ -101,9 +104,10 @@ export default function HomePage() {
               <SectionLabel>Estado del atlas</SectionLabel>
               <p className="mt-2 text-[14px] leading-relaxed text-muted">
                 <b className="text-fg">{WRITTEN_COUNT}</b> de {CONCEPTS.length} conceptos publicados (capa
-                Fundamentos completa). El resto ya está en el mapa con sus relaciones y prerrequisitos, marcado
-                como <span className="font-mono text-[12px]">pronto</span>. Cada concepto indica cuándo se
-                revisó y en qué fuentes primarias se basa.
+                Fundamentos completa), <b className="text-fg">{CASES.length}</b> casos de uso con laboratorio y un
+                catálogo de <b className="text-fg">{TOOLS.length}</b> herramientas. Los conceptos pendientes ya están
+                en el mapa con sus relaciones, marcados como <span className="font-mono text-[12px]">pronto</span>.
+                Cada contenido indica cuándo se revisó y en qué fuentes se basa.
               </p>
             </div>
           </Card>
@@ -117,38 +121,32 @@ function StackPreview() {
   const progress = useProgress((s) => s.concepts)
   return (
     <div className="space-y-1.5" aria-label="Capas del ecosistema">
-      {[...LAYERS].reverse().map((layer) => {
+      {LAYERS.map((layer) => {
         const concepts = conceptsInLayer(layer.id)
-        const written = concepts.filter((c) => hasContent(c.id)).length
         const learned = concepts.filter((c) => progress[c.id]?.learnedAt).length
         return (
           <Link
             key={layer.id}
-            to={`/map?view=list#${layer.id}`}
+            to={`/map#${layer.id}`}
             className="group flex items-center gap-3 rounded-xl border border-border bg-surface/70 px-4 py-2.5 backdrop-blur transition-colors hover:border-[var(--layer)]"
             style={{ '--layer': layer.color } as CSSProperties}
           >
             <span className="w-5 font-mono text-[11px] text-[var(--layer)]">{layer.index}</span>
             <span className="flex-1 text-[13.5px] font-medium">{layer.title}</span>
-            <span className="flex gap-[3px]">
-              {concepts.map((c, i) => (
-                <span
-                  key={c.id}
-                  className="h-2.5 w-1.5 rounded-sm"
-                  style={{
-                    background:
-                      i < learned
-                        ? 'var(--ok)'
-                        : hasContent(c.id)
-                          ? LAYER_BY_ID[layer.id].color
-                          : 'var(--border-strong)',
-                    opacity: hasContent(c.id) ? 1 : 0.6,
-                  }}
-                />
-              ))}
+            <span className="flex gap-[2px]" aria-hidden>
+              {concepts.map((c) => {
+                const style = PROGRESS_STYLE[progressState(c.id, progress[c.id])]
+                return (
+                  <span
+                    key={c.id}
+                    className="h-2.5 w-1.5 rounded-sm"
+                    style={{ background: style.background, border: style.border }}
+                  />
+                )
+              })}
             </span>
-            <span className="w-10 text-right font-mono text-[10.5px] text-subtle">
-              {written}/{concepts.length}
+            <span className="w-14 text-right font-mono text-[10.5px] text-subtle" title="aprendidos / conceptos de la capa">
+              {learned}/{concepts.length}
             </span>
           </Link>
         )
