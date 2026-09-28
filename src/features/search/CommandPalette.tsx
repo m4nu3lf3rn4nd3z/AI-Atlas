@@ -13,6 +13,7 @@ import { LABS } from '@/labs/registry'
 import { useUi } from '@/stores/ui'
 
 const PAGES = [
+  { to: '/security', label: 'Seguridad: revisión de arquitectura (superficies, ataques, checklist)' },
   { to: '/map', label: 'Mapa del ecosistema' },
   { to: '/paths', label: 'Rutas de aprendizaje' },
   { to: '/labs', label: 'Labs' },

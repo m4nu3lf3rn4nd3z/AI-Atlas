@@ -1,4 +1,4 @@
-import { ArrowRight, Briefcase, FlaskConical, Network, Route, Sparkles } from 'lucide-react'
+import { ArrowRight, Briefcase, FlaskConical, Network, Route, ShieldAlert, Sparkles } from 'lucide-react'
 import type { CSSProperties } from 'react'
 import { Link } from 'react-router'
 import { Button } from '@/components/ui/button'
@@ -29,7 +29,25 @@ export default function HomePage() {
             'radial-gradient(600px 260px at 20% 0%, color-mix(in oklab, var(--l0) 16%, transparent), transparent), radial-gradient(500px 240px at 85% 10%, color-mix(in oklab, var(--l2) 12%, transparent), transparent)',
         }}
       />
-      <div className="relative mx-auto max-w-6xl px-5 pt-14 pb-20 sm:px-8">
+      <div className="relative mx-auto max-w-6xl px-5 pt-8 pb-20 sm:px-8">
+        <Link
+          to="/security"
+          className="group mb-10 flex items-center gap-4 rounded-2xl border border-bad/35 bg-bad/5 px-5 py-4 transition-colors hover:border-bad/60"
+        >
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-bad/10 text-bad">
+            <ShieldAlert className="size-5" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="flex flex-wrap items-center gap-2">
+              <span className="rounded bg-bad/15 px-1.5 py-0.5 text-[10.5px] font-semibold text-bad">IMPORTANTE</span>
+              <span className="text-[15px] font-semibold">Seguridad: revisión de arquitectura de sistemas de IA</span>
+            </span>
+            <span className="mt-0.5 block text-[13px] text-muted">
+              Superficies de ataque, técnicas, patrones de diseño seguro y checklist de revisión para LLMs, RAG, MCP y agentes.
+            </span>
+          </span>
+          <ArrowRight className="size-4 shrink-0 text-subtle group-hover:text-fg" />
+        </Link>
         <section className="grid gap-12 lg:grid-cols-[1.1fr_1fr] lg:items-center">
           <div>
             <p className="font-mono text-[11px] tracking-[0.14em] text-subtle">

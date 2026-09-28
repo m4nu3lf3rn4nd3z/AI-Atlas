@@ -1,4 +1,4 @@
-import { BookText, Briefcase, FlaskConical, Gauge, Moon, Network, Route, Search, Sun, Wrench } from 'lucide-react'
+import { BookText, Briefcase, FlaskConical, Gauge, Moon, Network, Route, Search, ShieldAlert, Sun, Wrench } from 'lucide-react'
 import { lazy, Suspense, useEffect } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router'
 import { Kbd, Tooltip } from '@/components/ui/primitives'
@@ -9,6 +9,7 @@ import { Logo } from './Logo'
 
 const NAV = [
   { to: '/map', label: 'Mapa', icon: Network },
+  { to: '/security', label: 'Seguridad', icon: ShieldAlert, highlight: true },
   { to: '/paths', label: 'Rutas', icon: Route },
   { to: '/labs', label: 'Labs', icon: FlaskConical },
   { to: '/cases', label: 'Casos', icon: Briefcase },
@@ -53,7 +54,7 @@ export function AppShell() {
           <span className="hidden text-[14px] font-semibold tracking-tight sm:inline">AI Atlas</span>
         </Link>
         <nav className="flex items-center gap-0.5" aria-label="Principal">
-          {NAV.map(({ to, label, icon: Icon }) => (
+          {NAV.map(({ to, label, icon: Icon, highlight }) => (
             <NavLink
               key={to}
               to={to}
@@ -68,7 +69,7 @@ export function AppShell() {
                 )
               }
             >
-              <Icon className="size-4" aria-hidden />
+              <Icon className={cn('size-4', highlight && 'text-bad')} aria-hidden />
               <span className="hidden lg:inline">{label}</span>
             </NavLink>
           ))}
