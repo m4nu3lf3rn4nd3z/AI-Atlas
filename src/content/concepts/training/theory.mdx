@@ -1,0 +1,43 @@
+El modelo al que llamas por API no sale así de una sola vez. Pasa por varias fases, cada una con datos, objetivos y costes muy distintos. Entenderlas explica por qué los modelos saben tanto, por qué a veces son serviles o demasiado cautos, y por qué el fine-tuning rara vez sirve para enseñarles hechos nuevos.
+
+<Diagram name="training" caption="El pre-training se lleva la inmensa mayoría del cómputo; las fases posteriores son baratas, pero son las que definen el comportamiento." />
+
+## 1. Pre-training: aprender el mundo prediciendo texto
+
+El modelo lee **billones de tokens** (Llama 3 se entrenó con más de 15 billones) y aprende a <Concept id="next-token">predecir el siguiente token</Concept>. Es, con diferencia, la fase más cara: semanas o meses en miles de GPU.
+
+El resultado es un <Term id="base-model">modelo base</Term>. Sabe muchísimo, pero no se comporta como un asistente. Si le escribes «¿Cuál es la capital de Francia?», puede continuar con «¿Y la de Italia? ¿Y la de España?», porque así continúan muchos textos de internet.
+
+<Callout type="note" title="Leyes de escala">
+Chinchilla (2022) estimó que, con un presupuesto de cómputo fijo, lo óptimo es entrenar con unos 20 tokens por parámetro. Hoy se entrena muy por encima (Llama 3 8B vio casi 2.000 tokens por parámetro), porque un modelo pequeño bien entrenado es mucho más barato de servir durante toda su vida útil.
+</Callout>
+
+## 2. Post-training: convertirlo en un asistente
+
+<Steps>
+  <Step title="SFT (supervised fine-tuning)">Se entrena con pares instrucción → respuesta ideal, en formato de chat y con sus tokens especiales. El modelo aprende a responder en lugar de continuar, y adopta un rol y un formato.</Step>
+  <Step title="Optimización por preferencias">Se muestran varias respuestas a la misma pregunta y se indica cuál es mejor. Con <Term id="rlhf">RLHF</Term> se entrena un <Term id="reward-model">modelo de recompensa</Term> con esas preferencias y se optimiza el LLM contra él. <Term id="dpo">DPO</Term> consigue un efecto parecido directamente desde los pares, sin modelo de recompensa ni RL. Las preferencias pueden venir de personas o de otro modelo guiado por principios escritos (RLAIF, *Constitutional AI*).</Step>
+  <Step title="RL con recompensas verificables">En problemas con respuesta comprobable (matemáticas, código con tests) se premia acertar. Así surgen los <Concept id="reasoning-models">modelos de razonamiento</Concept>, que aprenden a plantear, comprobar y corregir.</Step>
+</Steps>
+
+## Qué aprende en cada fase
+
+La mayor parte del **conocimiento** se adquiere en el pre-training. El post-training usa muchísimos menos datos y moldea sobre todo el **comportamiento**: formato, tono, cuándo negarse, cómo usar herramientas. El trabajo LIMA (2023) llegó a mostrar que unas mil respuestas bien elegidas bastaban para dar a un buen modelo base un comportamiento de asistente convincente.
+
+Esto tiene una consecuencia práctica directa:
+
+<Callout type="insight" title="Por qué el fine-tuning no suele añadir conocimiento">
+Si quieres que el modelo responda con los datos de tu empresa, un fine-tuning con unos cientos de ejemplos cambiará su estilo mucho más que lo que sabe, y puede aumentar las alucinaciones sobre esos mismos temas. Para conocimiento se usa <Concept id="rag">RAG</Concept>; para comportamiento, prompting y, si hace falta, <Concept id="fine-tuning">fine-tuning</Concept>.
+</Callout>
+
+## Efectos secundarios que verás en producción
+
+- **Fecha de corte**: el conocimiento se congela con los datos de entrenamiento. Todo lo posterior hay que dárselo en el contexto o mediante herramientas.
+- **Complacencia (*sycophancy*)**: optimizar para lo que la gente prefiere puede premiar dar la razón al usuario o sonar seguro. Es un problema conocido que los laboratorios intentan corregir explícitamente.
+- **Rechazos excesivos**: el ajuste de seguridad a veces generaliza de más y el modelo se niega a peticiones legítimas.
+
+<Callout type="tradeoff">
+Cada fase de post-training mejora unas cosas y puede empeorar otras. Más ajuste de seguridad reduce respuestas dañinas pero aumenta los falsos rechazos; más optimización por preferencias mejora la experiencia percibida pero puede reforzar la complacencia. Los modelos que usas son un equilibrio elegido por su laboratorio.
+</Callout>
+
+Siguiente paso: la fase más reciente y la que más ha cambiado la práctica, los <Concept id="reasoning-models">modelos de razonamiento</Concept>.

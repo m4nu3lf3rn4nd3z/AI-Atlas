@@ -1,0 +1,42 @@
+Desde finales de 2024, los modelos punteros ya no responden directamente: primero generan una cadena de razonamiento, a veces de miles de tokens, y después la respuesta. Empezó con o1 de OpenAI (septiembre de 2024), se popularizó con DeepSeek-R1 (enero de 2025, con pesos abiertos) y hoy casi todos los modelos frontera tienen un modo de "pensar". Es el cambio más importante en cómo se usan los LLM desde el propio ChatGPT.
+
+<Diagram name="reasoning" />
+
+## De «piensa paso a paso» a modelos entrenados para razonar
+
+En 2022 se descubrió que pedir al modelo que razonara paso a paso (<Term id="cot">chain of thought</Term>) mejoraba mucho sus resultados en problemas de varios pasos. Tiene sentido si recuerdas que el modelo <Concept id="next-token">predice token a token</Concept>: escribir los pasos intermedios le da "espacio de cálculo" y le permite apoyarse en resultados parciales en lugar de adivinar la respuesta de golpe.
+
+Los modelos de razonamiento llevan esa idea al entrenamiento. Con **aprendizaje por refuerzo sobre problemas verificables** (matemáticas con solución conocida, código con tests), el modelo recibe recompensa solo si acierta, y aprende por sí mismo estrategias útiles: descomponer el problema, comprobar resultados intermedios, detectar errores y volver atrás. DeepSeek-R1 mostró que esos comportamientos emergen incluso con RL puro, sin ejemplos humanos de razonamiento.
+
+## Un nuevo eje de escala: el cómputo en inferencia
+
+Hasta entonces, mejorar un modelo significaba entrenarlo más grande o con más datos. Ahora hay un segundo mando: dejarle **pensar más al responder** (<Term id="test-time-compute">test-time compute</Term>). En tareas difíciles, la precisión sube de forma aproximadamente logarítmica con los tokens de razonamiento: cada duplicación aporta una mejora parecida, hasta saturar. También se puede gastar cómputo en paralelo: generar varias soluciones y votar o verificar.
+
+## Cómo se usa en las APIs
+
+<Steps>
+  <Step title="Controlas el esfuerzo, no la temperatura">Se elige un nivel de esfuerzo (por ejemplo `low` / `medium` / `high` en Anthropic con `output_config.effort`, o `reasoning_effort` en OpenAI). En los modelos Claude actuales el modelo decide cuánto pensar (*adaptive thinking*) y los parámetros de sampling ya no se aceptan.</Step>
+  <Step title="Pagas el razonamiento">Los tokens de razonamiento se facturan como salida y añaden latencia, aunque a menudo solo veas un resumen o nada.</Step>
+  <Step title="Lo ves resumido, o no lo ves">Los proveedores suelen devolver un resumen del razonamiento en lugar de la cadena completa. Los modelos abiertos (Qwen3, DeepSeek-R1, gpt-oss…) sí la muestran entera.</Step>
+</Steps>
+
+## Cuándo compensa
+
+| Compensa | No compensa |
+|---|---|
+| Matemáticas, lógica, código no trivial | Extraer campos, clasificar, traducir |
+| Planificar tareas de varios pasos, agentes | Chat casual, respuestas cortas |
+| Analizar documentos con muchas condiciones | Tareas donde la latencia manda |
+| Depurar, revisar, buscar errores | Formatos muy estrictos y simples |
+
+<Callout type="tradeoff">
+Más esfuerzo significa más precisión en tareas difíciles, pero también más coste y más latencia, y a veces sobre-análisis de preguntas sencillas. Ajusta el esfuerzo por tipo de tarea, midiendo con tus propios casos, en lugar de fijar el máximo para todo.
+</Callout>
+
+**Cómo cambia el prompting:** con estos modelos funcionan mejor las instrucciones que describen el objetivo, el contexto y las restricciones que las recetas paso a paso («primero haz X, luego Y»). El modelo ya sabe descomponer; tu trabajo es dejar claro qué es un buen resultado.
+
+<Callout type="warning" title="El razonamiento visible no es una explicación fiel">
+La cadena de pensamiento que ves es texto generado, no un registro del cálculo interno. Investigaciones de 2025 mostraron que los modelos a veces usan pistas que no mencionan en su razonamiento. Es útil para depurar y entender, pero no la trates como una auditoría de por qué el modelo decidió algo.
+</Callout>
+
+Siguiente paso: cómo se consigue que modelos enormes sean baratos de ejecutar, con <Concept id="mixture-of-experts">Mixture of Experts</Concept>.

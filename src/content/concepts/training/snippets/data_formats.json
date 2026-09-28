@@ -1,0 +1,27 @@
+{
+  "sft_example": {
+    "messages": [
+      { "role": "system", "content": "Eres un asistente de soporte de una empresa de software." },
+      { "role": "user", "content": "¿Cómo cambio mi contraseña?" },
+      {
+        "role": "assistant",
+        "content": "Ve a Ajustes → Seguridad → Cambiar contraseña. Te pediremos la actual y la nueva dos veces."
+      }
+    ]
+  },
+  "preference_example": {
+    "prompt": [{ "role": "user", "content": "Resume en una frase qué es un KV cache." }],
+    "chosen": [
+      {
+        "role": "assistant",
+        "content": "Es la memoria donde el modelo guarda las keys y values de los tokens ya procesados para no recalcularlas al generar cada token nuevo."
+      }
+    ],
+    "rejected": [
+      {
+        "role": "assistant",
+        "content": "El KV cache es un tipo de base de datos clave-valor que usan los LLM para guardar las conversaciones de los usuarios."
+      }
+    ]
+  }
+}

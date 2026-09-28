@@ -1,0 +1,43 @@
+Un id de token es un número arbitrario: que `" gato"` sea el 99767 no dice nada de los gatos. Lo primero que hace el modelo es sustituir cada id por un **vector** de miles de números reales. Esos vectores, los <Term id="embedding">embeddings</Term>, son la forma en que el modelo representa el significado, y la misma idea es la base de la búsqueda semántica y del RAG.
+
+## De id a vector: la tabla de embeddings
+
+Dentro del modelo hay una matriz con **una fila por token del vocabulario** y tantas columnas como la dimensión del modelo (`d_model`). Convertir un token en vector es simplemente leer su fila.
+
+Las cifras son grandes: un modelo tipo Llama 3 8B tiene un vocabulario de 128.256 tokens y `d_model = 4096`, así que esa tabla ocupa por sí sola unos **525 millones de parámetros**. Nadie escribe esos números a mano: empiezan siendo aleatorios y se ajustan durante el entrenamiento, igual que el resto de pesos.
+
+## La geometría del significado
+
+El entrenamiento empuja a que tokens que aparecen en contextos parecidos acaben con vectores parecidos. El resultado es un espacio donde **la dirección codifica significado**:
+
+<Diagram name="embedding-space" />
+
+Para comparar dos vectores se usa casi siempre la <Term id="cosine-similarity">similitud coseno</Term>:
+
+```text
+cos(a, b) = (a · b) / (‖a‖ · ‖b‖)      → 1 igual dirección · 0 sin relación · −1 opuestos
+```
+
+Si los vectores están normalizados (longitud 1), el coseno es simplemente el producto escalar, y por eso muchas bases de datos vectoriales normalizan al indexar. El ejemplo clásico de word2vec (`rey − hombre + mujer ≈ reina`) muestra que algunas relaciones quedan como direcciones del espacio, aunque en modelos modernos esas "aritméticas" son mucho menos limpias de lo que sugiere la anécdota.
+
+## Dos cosas distintas que se llaman igual
+
+<Callout type="note" title="Embeddings de token ≠ embeddings de texto">
+**Embeddings de token** (dentro del LLM): una fila por token, sin contexto. `" banco"` tiene el mismo vector de entrada en «me senté en el banco» y en «abrí una cuenta en el banco». Es la <Concept id="attention">atención</Concept> la que, capa a capa, mezcla el contexto y separa ambos sentidos.
+
+**Embeddings de texto** (para búsqueda): un modelo específico, normalmente un encoder entrenado de forma contrastiva, que convierte una frase o un documento entero en **un solo vector**. Es lo que usas en un <Concept id="rag">RAG</Concept> o en un buscador semántico.
+</Callout>
+
+Los modelos de embeddings de texto se entrenan con pares que deben quedar cerca (una pregunta y su respuesta, una frase y su paráfrasis) y pares que deben quedar lejos. Por eso capturan bien la *similitud temática*, que es justo lo que necesita un buscador.
+
+## En la práctica
+
+- **Dimensión**: entre 384 y ~3000 según el modelo. Más dimensiones no garantizan más calidad; sí más memoria y búsquedas más lentas. Algunos modelos (entrenamiento *Matryoshka*) permiten truncar el vector y conservar gran parte de la calidad.
+- **Mismo modelo para indexar y para consultar.** Los vectores de modelos distintos viven en espacios distintos y no son comparables, ni siquiera con la misma dimensión.
+- **Idioma**: para contenido en español usa un modelo multilingüe o evaluado en español. Los rankings como MTEB ayudan a preseleccionar, pero conviene medir con tus propios datos.
+
+<Callout type="warning" title="Similar no significa relevante ni verdadero">
+«Me gusta este producto» y «No me gusta este producto» suelen quedar muy cerca: comparten tema y casi todas las palabras. Los embeddings capturan de qué se habla mejor que qué se afirma, y son frágiles con negaciones, cifras y nombres propios poco frecuentes. Por eso los buenos sistemas de recuperación combinan vectores con búsqueda léxica y re-ranking.
+</Callout>
+
+Siguiente paso: cómo el modelo mezcla estos vectores entre sí para entender el contexto, con la <Concept id="attention">atención</Concept>.

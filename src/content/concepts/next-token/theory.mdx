@@ -1,0 +1,42 @@
+Detrás de un chat, de un agente que programa o de un resumen, un LLM hace exactamente una cosa: **dada una secuencia de tokens, calcula la probabilidad de cada token posible como siguiente**. Todo lo demás (conversar, razonar, llamar herramientas) sale de repetir ese paso con el contexto adecuado.
+
+<Diagram name="pipeline" caption="Un paso de generación. Los ids son reales (o200k_base); la elección de « azul» es ilustrativa." />
+
+## De vectores a probabilidades: logits y softmax
+
+Tras el último bloque transformer, el vector de la **última posición** se multiplica por una matriz de salida con una columna por token del vocabulario. El resultado son los <Term id="logits">logits</Term>: una puntuación por token, sin normalizar. Con un vocabulario de 200.000 tokens, son 200.000 números en cada paso.
+
+El <Term id="softmax">softmax</Term> convierte esas puntuaciones en una distribución de probabilidad:
+
+```text
+p(token_i) = e^(logit_i) / Σ_j e^(logit_j)
+```
+
+Qué token se elige a partir de esa distribución es un paso aparte, el <Concept id="sampling">sampling</Concept>, y es donde entran la temperatura y compañía.
+
+## Generación autorregresiva
+
+El token elegido se añade al final de la entrada y se repite el cálculo. El bucle termina cuando el modelo emite un token especial de fin de turno o cuando se alcanza `max_tokens`.
+
+<Callout type="insight" title="Por qué la salida es más lenta y más cara que la entrada">
+El prompt se procesa **en paralelo**: todos sus tokens en una sola pasada (el *prefill*). La respuesta se genera **de uno en uno**: cada token nuevo exige una pasada completa por el modelo (el *decode*). Por eso los proveedores cobran varias veces más por token de salida, y por eso una respuesta larga tarda aunque el prompt sea corto. Lo verás en detalle en <Concept id="context-window">ventana de contexto y KV cache</Concept>.
+</Callout>
+
+## Se entrena con el mismo objetivo
+
+Durante el pre-training el modelo lee texto real y, en cada posición, se penaliza con `−log p(token correcto)` (la *cross-entropy*). Si asignaba un 90 % al token que de verdad venía, la pérdida es pequeña; si asignaba un 0,1 %, es grande. Repetido sobre billones de tokens, ese objetivo tan simple obliga al modelo a aprender gramática, hechos, estilo y patrones de razonamiento, porque todo eso ayuda a predecir.
+
+La <Term id="perplexity">perplejidad</Term> es la exponencial de esa pérdida media: una perplejidad de 8 significa que el modelo está, en promedio, tan indeciso como si eligiera entre 8 opciones igual de probables. Solo es comparable entre modelos con el mismo tokenizador.
+
+## Qué implica para quien construye con LLMs
+
+- **Optimiza plausibilidad, no verdad.** Una afirmación falsa pero fluida puede ser muy probable. Esa es la raíz de las <Term id="hallucination">alucinaciones</Term>, y la razón por la que se usa <Concept id="rag">RAG</Concept> para anclar respuestas a fuentes.
+- **No hay una base de datos dentro.** El conocimiento está disperso en los pesos, sin consulta ni cita posible. Preguntas sobre datos posteriores al entrenamiento requieren aportar esos datos en el contexto.
+- **Todo depende del contexto.** El mismo modelo produce distribuciones muy distintas según lo que haya antes. Por eso el prompt, los ejemplos y el formato importan tanto.
+- **No puede volver atrás.** Un token emitido queda fijo. Si empieza mal una respuesta, tiende a justificarla. Los <Concept id="reasoning-models">modelos de razonamiento</Concept> mitigan esto generando antes un borrador que sí pueden revisar.
+
+<Callout type="note" title="Mira las probabilidades">
+Algunas APIs y runtimes devuelven *logprobs*: la log-probabilidad de cada token generado y de sus alternativas. Son útiles para medir la confianza del modelo en una clasificación o detectar respuestas dudosas. Solo tienen sentido comparadas dentro del mismo modelo.
+</Callout>
+
+Siguiente paso: cómo convertir esa distribución en un token concreto, con el <Concept id="sampling">sampling</Concept>.

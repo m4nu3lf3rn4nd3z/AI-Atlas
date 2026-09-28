@@ -1,0 +1,60 @@
+Cuando llamas a una API, pagas por **tokens**, el límite de contexto se mide en **tokens** y el modelo, de hecho, nunca ve tu texto: ve una lista de números enteros. Entender cómo se trocea el texto explica facturas, límites y varios fallos famosos de los LLM.
+
+<Callout type="insight">
+El modelo no lee letras ni palabras. Lee <Term id="token">tokens</Term>: fragmentos de texto sacados de un vocabulario fijo, cada uno con un id. Todo lo que el modelo "sabe" sobre las letras de un token lo ha tenido que aprender.
+</Callout>
+
+## Qué es un token
+
+Escribe algo y mira cómo lo trocea un tokenizador real, el mismo que usan los modelos recientes de OpenAI:
+
+<TokenPreview text="La tokenización no es trivial" />
+
+Fíjate en tres cosas:
+
+- **El espacio va pegado a la palabra siguiente.** `" no"` y `"no"` son tokens distintos. `"hola"`, `" hola"`, `"Hola"` y `"HOLA"` tienen ids diferentes, y `"HOLA"` ni siquiera cabe en un solo token.
+- **Las palabras comunes son un token; las raras se trocean.** `" token"` + `"ización"`, o `"electroencefalografista"` en 6 piezas.
+- **Algunos caracteres ocupan varios tokens.** Muchos emojis se codifican como varios bytes UTF-8 y el tokenizador puede partirlos.
+
+## Cómo se construye el vocabulario: BPE
+
+Casi todos los LLM actuales usan variantes de <Term id="bpe">Byte-Pair Encoding</Term>, un algoritmo de compresión adaptado a texto. El vocabulario se *aprende* una vez, antes de entrenar el modelo:
+
+<Steps>
+  <Step title="Empieza por los bytes">El vocabulario inicial son los 256 valores de byte. Cualquier texto en UTF-8 se puede representar, así que nunca hay un token "desconocido".</Step>
+  <Step title="Cuenta pares">Sobre un corpus enorme, cuenta qué pares de símbolos adyacentes aparecen más (por ejemplo `e` + `s`).</Step>
+  <Step title="Fusiona el más frecuente">Ese par se convierte en un símbolo nuevo del vocabulario (`es`) y se reemplaza en todo el corpus.</Step>
+  <Step title="Repite">Hasta llegar al tamaño de vocabulario deseado: de ~50k (GPT-2) a ~100k (`cl100k_base`), ~128k (Llama 3) o ~200k (`o200k_base`).</Step>
+</Steps>
+
+Al tokenizar un texto nuevo se aplican esas mismas fusiones en orden. Por eso las secuencias frecuentes en el corpus de entrenamiento acaban siendo un solo token y las raras quedan partidas.
+
+## Por qué importa en la práctica
+
+### Coste, latencia y contexto
+
+Precio, límite de contexto y velocidad de generación se miden en tokens. La regla aproximada que suele citarse es de unos 4 caracteres por token en inglés, aunque varía mucho según el texto (código, números o palabras raras bajan la cifra). **En español la eficiencia es menor para el mismo contenido**: la frase «La inteligencia artificial generativa está transformando la manera en que desarrollamos software.» ocupa 16 tokens con `o200k_base`, frente a 12 de su traducción al inglés. Es un 33 % más de coste y de contexto por el mismo contenido. Compruébalo con otros textos en el [lab](/labs/tokenizer).
+
+### Los fallos "tontos" tienen causa
+
+<Callout type="warning" title="Contar letras y hacer cuentas">
+«¿Cuántas erres tiene *strawberry*?» fue un fallo célebre: el modelo recibe `st` + `raw` + `berry`, no diez letras. Lo mismo pasa con la aritmética: `12345` se tokeniza como `123` + `45`, así que sumar dígito a dígito exige que el modelo haya aprendido la estructura interna de cada trozo.
+</Callout>
+
+Los modelos modernos mitigan esto con entrenamiento específico, razonamiento paso a paso o usando herramientas (una calculadora, ejecutar código). La causa de fondo sigue siendo la misma.
+
+### Cada familia de modelos tiene su tokenizador
+
+El vocabulario forma parte del modelo: la tabla de <Term id="embedding">embeddings</Term> tiene exactamente una fila por token. Por eso no puedes intercambiar tokenizadores, y contar tokens con `tiktoken` para un modelo de otra familia (Llama, Claude, Gemini…) solo te da una **aproximación**. Para cifras exactas usa el tokenizador del propio modelo o el endpoint de conteo de su proveedor.
+
+### Los tokens especiales y la plantilla de chat
+
+Además del texto, el vocabulario incluye **tokens especiales** que marcan el inicio y el fin de cada mensaje y el rol (sistema, usuario, asistente). Cuando envías `messages` a una API, la plantilla de chat los inserta por ti. Cuestan tokens, y si alguna vez construyes el prompt a mano con un modelo abierto, una plantilla mal aplicada degrada mucho las respuestas.
+
+## El trade-off del tamaño del vocabulario
+
+<Callout type="tradeoff">
+Un vocabulario **más grande** codifica más texto por token: secuencias más cortas, inferencia más barata y más idiomas bien representados. Pero la matriz de embeddings y la capa de salida crecen (una fila por token), y los tokens raros se ven poco durante el entrenamiento. La tendencia de los últimos años ha sido crecer: de 50k a 128k–260k.
+</Callout>
+
+Siguiente paso: cada id de token se convierte en un vector. Eso son los <Concept id="embeddings">embeddings</Concept>.

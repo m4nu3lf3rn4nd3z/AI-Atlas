@@ -1,0 +1,55 @@
+Tras la tabla de embeddings, cada token es un vector aislado: «banco» no sabe si está junto a «parque» o junto a «hipoteca». El <Term id="transformer">transformer</Term> resuelve esto apilando decenas de **bloques**, y cada bloque hace dos cosas:
+
+1. **Atención**: cada token recoge información de los tokens anteriores que le resultan relevantes.
+2. **Feed-forward (FFN)**: una red densa procesa cada token por separado y transforma esa información. Aquí se concentra buena parte de los parámetros y del "conocimiento" del modelo.
+
+Entre medias hay conexiones residuales y normalización, que permiten apilar muchos bloques (32 en un modelo de 8B, 80 en uno de 70B) sin que el entrenamiento se desestabilice.
+
+## Query, Key, Value
+
+Para cada token, la capa de atención calcula tres vectores mediante tres matrices aprendidas:
+
+<Steps>
+  <Step title="Query (q): qué busco">Lo que este token necesita saber de su contexto.</Step>
+  <Step title="Key (k): qué ofrezco">Cómo se "anuncia" cada token para ser encontrado.</Step>
+  <Step title="Value (v): qué aporto">La información que se copiará si alguien me presta atención.</Step>
+</Steps>
+
+La relevancia de un token j para el token i es el producto escalar `qᵢ · kⱼ`. Esas puntuaciones pasan por un <Term id="softmax">softmax</Term> y se convierten en pesos que suman 1, y la salida es la **media ponderada de los values**:
+
+```text
+Attention(Q, K, V) = softmax( Q·Kᵀ / √d  +  máscara ) · V
+```
+
+La división por `√d` evita que los productos escalares crezcan con la dimensión y saturen el softmax. La máscara es la <Term id="causal-mask">máscara causal</Term>, que pone a −∞ las posiciones futuras para que nadie mire hacia delante.
+
+<Diagram name="attention" caption="Una fila por token: cuánto atiende a cada token anterior." />
+
+## Muchas cabezas en paralelo
+
+Una sola atención solo puede fijarse en un tipo de relación a la vez. Por eso cada capa tiene decenas de <Term id="attention-head">cabezas</Term> independientes, cada una con sus propias matrices Q, K y V y una fracción de la dimensión. Unas siguen relaciones sintácticas, otras la correferencia («cansado» → «gato»), otras simplemente el token anterior. Sus salidas se concatenan y se proyectan de vuelta.
+
+<Callout type="note" title="La atención no sabe de posiciones">
+El producto escalar no depende del orden: sin información extra, «el perro mordió al hombre» y «el hombre mordió al perro» serían indistinguibles. Los modelos actuales usan <Term id="rope">RoPE</Term>, que rota queries y keys según su posición, de forma que la puntuación depende de la distancia relativa entre tokens.
+</Callout>
+
+## El coste cuadrático
+
+Cada token compara su query con las keys de todos los anteriores, así que el cómputo de la atención crece con el **cuadrado** de la longitud: duplicar el contexto cuadruplica ese trabajo. Es la razón de fondo de que el contexto largo sea caro y de que exista una familia entera de optimizaciones:
+
+| Técnica | Qué ataca |
+|---|---|
+| <Term id="flash-attention">FlashAttention</Term> | No materializa la matriz n×n en memoria lenta. Mismo resultado exacto, mucho más rápido. |
+| <Term id="gqa">GQA</Term> / MQA | Varias cabezas de query comparten keys y values. Reduce mucho el <Concept id="context-window">KV cache</Concept>. |
+| Ventana deslizante | Algunas capas solo miran los últimos N tokens. |
+| <Concept id="mixture-of-experts">MoE</Concept> | No toca la atención: abarata la FFN activando solo unos pocos expertos por token. |
+
+<Callout type="tradeoff">
+GQA es hoy el estándar porque ofrece casi la calidad de la atención multi-cabeza completa con una fracción de la memoria de KV cache. MQA (una sola key/value para todas las cabezas) ahorra aún más, pero pierde calidad de forma apreciable.
+</Callout>
+
+## Por qué funcionó tan bien
+
+Las redes recurrentes anteriores procesaban el texto token a token. La atención procesa **todas las posiciones en paralelo** durante el entrenamiento y conecta cualquier par de tokens en un solo paso, en lugar de hacer pasar la información por una cadena larga. Eso encajó a la perfección con las GPU y permitió escalar datos y parámetros como nunca antes. Es la idea del paper de 2017 *Attention Is All You Need*.
+
+Siguiente paso: qué sale por arriba de la pila de bloques: la <Concept id="next-token">predicción del siguiente token</Concept>.

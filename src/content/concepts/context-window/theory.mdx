@@ -1,0 +1,47 @@
+La <Term id="context-window">ventana de contexto</Term> es el número máximo de tokens que el modelo puede procesar en una llamada, **sumando entrada y salida**. Ha pasado de 2.048 tokens en GPT-3 (2020) a 128k–1M en los modelos actuales. Pero que algo quepa no significa que salga gratis ni que el modelo lo use bien.
+
+## Por qué el contexto es limitado
+
+- **Cómputo**: en el *prefill*, la <Concept id="attention">atención</Concept> compara cada token con todos los anteriores, y ese coste crece con el cuadrado de la longitud.
+- **Memoria**: durante la generación hay que guardar información de cada token previo (el KV cache), y esa memoria crece linealmente con el contexto y con el número de usuarios simultáneos.
+- **Entrenamiento**: un modelo solo maneja bien longitudes parecidas a las que vio al entrenar. Extender el contexto exige entrenamiento adicional con secuencias largas.
+
+## El KV cache: prefill y decode
+
+Al generar el token 1.001, las keys y values de los 1.000 tokens anteriores no han cambiado. Recalcularlas en cada paso sería absurdo, así que se guardan: eso es el <Term id="kv-cache">KV cache</Term>.
+
+<Diagram name="kv-cache" />
+
+Esto divide la inferencia en dos fases con perfiles muy distintos:
+
+| Fase | Qué hace | Limitada por | Métrica |
+|---|---|---|---|
+| <Term id="prefill">Prefill</Term> | Procesa todo el prompt en paralelo y llena la caché | Cómputo | <Term id="ttft">TTFT</Term> (tiempo hasta el primer token) |
+| <Term id="decode">Decode</Term> | Genera un token por paso leyendo toda la caché | Ancho de banda de memoria | Tokens por segundo |
+
+<Callout type="insight" title="La API no tiene memoria">
+Las APIs de chat son *stateless*: en cada turno reenvías toda la conversación. En una charla de 50 turnos, el modelo vuelve a procesar el turno 1 cincuenta veces. El coste acumulado crece mucho más deprisa que la conversación, y por eso existe el *prompt caching*: el proveedor guarda el KV cache de un prefijo idéntico y te cobra mucho menos por reutilizarlo.
+</Callout>
+
+## Que quepa no significa que se use
+
+Los modelos no prestan la misma atención a todo el contexto. El trabajo *Lost in the Middle* (2023) mostró que la información situada en el centro de un contexto largo se aprovecha peor que la del principio o el final:
+
+<Diagram name="lost-in-middle" caption="Forma cualitativa del resultado de Liu et al. (2023). Los modelos recientes lo han mejorado mucho, pero no ha desaparecido." />
+
+Los modelos actuales superan con facilidad las pruebas de "aguja en un pajar" (encontrar una frase literal escondida en un texto enorme). Las tareas reales son más difíciles: relacionar datos dispersos, ignorar información parecida pero irrelevante, razonar sobre todo el documento. En ellas el rendimiento sigue degradándose a medida que crece el contexto, un fenómeno que se ha llamado *context rot*.
+
+## Estrategias
+
+<Steps>
+  <Step title="Mete lo relevante, no todo">Recuperar los 5 fragmentos adecuados con <Concept id="rag">RAG</Concept> suele funcionar mejor, y costar mucho menos, que pegar 500 páginas.</Step>
+  <Step title="Cuida la posición">Instrucciones clave al principio (system prompt) y la pregunta concreta al final, después de los documentos.</Step>
+  <Step title="Gestiona el historial">Resume o recorta turnos antiguos en conversaciones largas; las APIs modernas ofrecen compactación automática.</Step>
+  <Step title="Aprovecha la caché">Pon lo estable (instrucciones, documentos fijos, definiciones de herramientas) al principio y lo variable al final, para que el prefijo cacheado se reutilice.</Step>
+</Steps>
+
+<Callout type="tradeoff">
+Más contexto da más información al modelo, pero también más coste, más latencia (TTFT) y más oportunidades de distraerse. El contexto es un presupuesto: gástalo en lo que cambia la respuesta.
+</Callout>
+
+Siguiente paso: cómo se entrena un modelo para que aproveche todo esto, en <Concept id="training">entrenamiento</Concept>.

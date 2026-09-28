@@ -1,0 +1,52 @@
+import type { ConceptMeta } from '../schema'
+
+export const adaptation: ConceptMeta[] = [
+  {
+    id: 'prompt-engineering',
+    title: 'Prompt y context engineering',
+    short: 'Diseñar todo lo que entra en la ventana: instrucciones, ejemplos, datos y formato.',
+    layer: 'adaptation',
+    kind: 'technique',
+    level: 1,
+    tags: ['system prompt', 'few-shot', 'context engineering'],
+    prerequisites: ['llm-apis', 'context-window'],
+    relations: [{ to: 'fine-tuning', type: 'alternative' }],
+  },
+  {
+    id: 'structured-outputs',
+    title: 'Structured outputs',
+    short: 'Forzar que la salida cumpla un JSON Schema restringiendo qué tokens se pueden muestrear.',
+    layer: 'adaptation',
+    kind: 'technique',
+    level: 2,
+    tags: ['JSON Schema', 'constrained decoding', 'gramáticas'],
+    prerequisites: ['sampling', 'llm-apis'],
+    relations: [
+      { to: 'sampling', type: 'uses', note: 'enmascara tokens inválidos' },
+      { to: 'tool-calling', type: 'enables' },
+    ],
+  },
+  {
+    id: 'fine-tuning',
+    title: 'Fine-tuning (LoRA, QLoRA)',
+    short: 'Seguir entrenando con tus datos para cambiar comportamiento o estilo; rara vez para añadir conocimiento.',
+    layer: 'adaptation',
+    kind: 'technique',
+    level: 3,
+    tags: ['LoRA', 'QLoRA', 'SFT', 'DPO', 'PEFT'],
+    prerequisites: ['training', 'quantization'],
+    relations: [{ to: 'rag', type: 'alternative', note: 'comportamiento vs conocimiento' }],
+  },
+  {
+    id: 'prompt-rag-finetune',
+    title: '¿Prompt, RAG o fine-tuning?',
+    short: 'Un marco de decisión: qué problema resuelve cada técnica y en qué orden probarlas.',
+    layer: 'adaptation',
+    kind: 'pattern',
+    level: 2,
+    tags: ['decisión', 'arquitectura'],
+    prerequisites: ['prompt-engineering', 'fine-tuning', 'rag'],
+    relations: [],
+    labId: 'decision',
+  },
+]

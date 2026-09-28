@@ -1,0 +1,45 @@
+En un modelo **denso**, cada token pasa por todos los parámetros. En un modelo <Term id="moe">Mixture of Experts</Term> (MoE), la capa feed-forward de cada bloque se sustituye por muchas redes más pequeñas, los *expertos*, y un <Term id="router">router</Term> decide para cada token cuáles se ejecutan. Solo se activan unos pocos por token. Es como un modelo enorme en conocimiento con un coste por token de modelo mediano.
+
+<Diagram name="moe" />
+
+## Parámetros totales vs parámetros activos
+
+Esta distinción es la clave para leer las fichas de modelos actuales:
+
+| Modelo | Totales | Activos por token |
+|---|---|---|
+| Mixtral 8x7B | ~47B | ~13B |
+| DeepSeek-V3 | 671B | 37B |
+| Qwen3-235B-A22B | 235B | 22B (la «A22B» del nombre) |
+| gpt-oss-120b | ~117B | ~5B |
+
+- La **capacidad** (cuánto puede saber) crece con los parámetros **totales**.
+- El **cómputo por token** (velocidad y coste) crece con los parámetros **activos**.
+
+Por eso MoE ofrece mejor calidad por unidad de cómputo que un modelo denso, y por eso la mayoría de los modelos grandes recientes, abiertos y cerrados, usan esta arquitectura.
+
+## Cómo funciona el router
+
+Para cada token, el router (una capa lineal pequeña) puntúa todos los expertos, se queda con los *k* mejores (típicamente 2 a 8 de entre decenas o cientos), renormaliza sus pesos y combina sus salidas. Todo se aprende a la vez durante el entrenamiento.
+
+<Callout type="warning" title="El problema del equilibrio de carga">
+Si el router aprende a mandar casi todo a los mismos expertos, el resto no se entrena y se desperdicia capacidad. Los modelos MoE añaden mecanismos para repartir la carga: una penalización extra en la pérdida o, como en DeepSeek-V3, un sesgo ajustable por experto. Es una de las partes más delicadas de entrenarlos.
+</Callout>
+
+## El precio: memoria
+
+<Callout type="tradeoff" title="Barato en cómputo, caro en memoria">
+Aunque cada token solo use unos pocos expertos, **todos tienen que estar cargados en memoria**, porque el siguiente token puede necesitar otros. Un MoE de 47B totales y 13B activos genera tan rápido como un modelo denso de ~13B, pero necesita la memoria de uno de 47B.
+</Callout>
+
+Para ejecutar en local significa lo siguiente:
+
+- **Para saber si cabe**, calcula con los parámetros totales: `parámetros × bytes por peso` (tras la <Concept id="quantization">cuantización</Concept>).
+- **Para estimar la velocidad**, piensa en los activos: por eso un MoE grande puede ir sorprendentemente rápido en un Mac con mucha memoria unificada, o repartiendo expertos entre GPU y CPU.
+- **En servidores**, los expertos se reparten entre GPUs (*expert parallelism*), y el enrutado añade comunicación entre ellas.
+
+## Lo que los expertos no son
+
+Suena a que habrá un «experto en medicina» y otro «en código». Los análisis muestran algo más prosaico: la especialización suele ser sintáctica o superficial (signos de puntuación, ciertos tipos de token, patrones de formato) y rara vez corresponde a temas que una persona reconocería. El nombre es histórico, no una descripción.
+
+Con esto completas la capa de fundamentos. Desde aquí puedes seguir por los <Concept id="model-landscape">modelos actuales</Concept>, por la <Concept id="quantization">cuantización</Concept> para ejecutarlos en tu PC, o por <Concept id="rag">RAG</Concept> para conectarlos con tus datos.

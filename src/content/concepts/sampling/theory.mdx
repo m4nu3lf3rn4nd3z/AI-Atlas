@@ -1,0 +1,54 @@
+El modelo entrega una distribución de probabilidad; **alguien tiene que elegir un token**. Esa elección, el *sampling*, no forma parte de la red neuronal: es un algoritmo pequeño que se ejecuta fuera, y con el mismo modelo puede producir respuestas deterministas y aburridas o creativas e incoherentes. Juega con él antes de leer el resto:
+
+<SoftmaxPlayground />
+
+## Temperature
+
+La <Term id="temperature">temperatura</Term> divide los logits antes del softmax:
+
+```text
+p_i = softmax(logit_i / T)
+```
+
+- **T < 1** exagera las diferencias: el favorito se lleva casi toda la probabilidad.
+- **T = 1** usa la distribución tal como la aprendió el modelo.
+- **T > 1** aplana la distribución: los tokens improbables ganan peso.
+- **T → 0** equivale a <Term id="greedy">greedy</Term>: siempre el más probable.
+
+La temperatura no añade conocimiento ni creatividad al modelo: solo cambia cuánto se aleja el sampler de sus primeras opciones.
+
+## Recortar la cola: top-k, top-p y min-p
+
+Un vocabulario de 200.000 tokens tiene una cola enorme de opciones absurdas, cada una con probabilidad minúscula. **Juntas, pueden sumar bastante.** En un texto largo, antes o después se muestrea una, y a partir de ahí el texto descarrila. Los filtros eliminan esa cola antes de muestrear y renormalizan lo que queda:
+
+| Filtro | Qué conserva | Comportamiento |
+|---|---|---|
+| <Term id="top-k">top-k</Term> | Los k tokens más probables | Número fijo, sea cual sea la confianza del modelo |
+| <Term id="top-p">top-p</Term> (*nucleus*) | El conjunto mínimo que acumula una probabilidad p | Pocos candidatos si el modelo está seguro, muchos si duda |
+| <Term id="min-p">min-p</Term> | Los tokens con p ≥ min_p × p(favorito) | Escala con la confianza; aguanta mejor temperaturas altas |
+
+<Callout type="warning" title="El orden importa">
+Aplicar la temperatura antes o después de los filtros cambia el resultado. Hugging Face `transformers` aplica primero la temperatura; la cadena por defecto de llama.cpp la aplica al final. El widget de arriba y los labs de esta app siguen el orden de Hugging Face.
+</Callout>
+
+## Greedy no es "lo mejor"
+
+Elegir siempre el más probable parece lo más seguro, pero en textos largos tiende a repetirse y a producir frases planas: el texto humano no está formado por las palabras más probables en cada posición. Por eso la generación abierta muestrea, y la búsqueda por haz (*beam search*), útil en traducción, casi no se usa en chat.
+
+## En la práctica
+
+<Steps>
+  <Step title="Tareas con una respuesta correcta">Extracción, clasificación, código, SQL: temperatura baja (0–0,3). Quieres la opción más probable, no variedad.</Step>
+  <Step title="Tareas abiertas">Ideas, redacción, nombres: temperatura media o alta (0,7–1,0) con top-p o min-p para contener la cola.</Step>
+  <Step title="No toques todo a la vez">Ajusta temperatura y un solo filtro. Combinar top-k, top-p, min-p y penalizaciones hace el comportamiento difícil de razonar.</Step>
+</Steps>
+
+<Callout type="note" title="Temperatura 0 no garantiza determinismo">
+En una API, dos llamadas idénticas con T = 0 pueden diferir. El servidor agrupa tu petición con otras en *batches* de tamaño variable, y eso cambia el orden de las sumas en coma flotante; con modelos MoE también puede cambiar el enrutado. Si necesitas reproducibilidad, usa `seed` cuando exista y diseña para tolerar variaciones.
+</Callout>
+
+<Callout type="insight" title="Los modelos de razonamiento esconden estos controles">
+Muchas APIs recientes de <Concept id="reasoning-models">modelos de razonamiento</Concept> ya no aceptan `temperature` ni `top_p` distintos del valor por defecto. Los modelos actuales de Claude devuelven un error si los envías, y los modelos de razonamiento de OpenAI tampoco los admiten. El control pasa a ser el nivel de esfuerzo (*effort*). Con modelos abiertos en local (Ollama, llama.cpp, vLLM) sigues teniendo todos los parámetros.
+</Callout>
+
+Siguiente paso: por qué el modelo solo puede "ver" un número limitado de tokens y qué cuesta cada uno, en la <Concept id="context-window">ventana de contexto</Concept>.
