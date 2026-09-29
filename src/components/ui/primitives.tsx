@@ -1,4 +1,5 @@
-import { Tabs as TabsPrimitive, Tooltip as TooltipPrimitive } from 'radix-ui'
+import { Select as SelectPrimitive, Tabs as TabsPrimitive, Tooltip as TooltipPrimitive } from 'radix-ui'
+import { ChevronDown } from 'lucide-react'
 import type { ComponentProps, CSSProperties, ReactNode } from 'react'
 import { cn } from '@/lib/cn'
 
@@ -100,6 +101,70 @@ export function TabsContent({ className, ...props }: ComponentProps<typeof TabsP
   return <TabsPrimitive.Content className={cn('outline-none', className)} {...props} />
 }
 
+/* ─── Select ─── */
+export function Select(props: ComponentProps<typeof SelectPrimitive.Root>) {
+  return <SelectPrimitive.Root {...props} />
+}
+
+export function SelectTrigger({
+  className,
+  active,
+  children,
+  ...props
+}: ComponentProps<typeof SelectPrimitive.Trigger> & { active?: boolean }) {
+  return (
+    <SelectPrimitive.Trigger
+      className={cn(
+        'inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-border bg-surface px-3 text-[13px] text-fg outline-none transition-colors hover:border-border-strong focus:border-accent',
+        active && 'border-accent/60 bg-accent-soft',
+        className,
+      )}
+      {...props}
+    >
+      {children}
+      <SelectPrimitive.Icon asChild>
+        <ChevronDown className="ml-auto size-3.5 text-subtle" />
+      </SelectPrimitive.Icon>
+    </SelectPrimitive.Trigger>
+  )
+}
+
+export function SelectContent({ className, children, ...props }: ComponentProps<typeof SelectPrimitive.Content>) {
+  return (
+    <SelectPrimitive.Portal>
+      <SelectPrimitive.Content
+        position="popper"
+        sideOffset={4}
+        className={cn(
+          'z-50 min-w-[var(--radix-select-trigger-width)] overflow-hidden rounded-lg border border-border bg-surface shadow-xl shadow-black/20',
+          'data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95',
+          className,
+        )}
+        {...props}
+      >
+        <SelectPrimitive.Viewport className="p-1">{children}</SelectPrimitive.Viewport>
+      </SelectPrimitive.Content>
+    </SelectPrimitive.Portal>
+  )
+}
+
+export function SelectItem({ className, children, ...props }: ComponentProps<typeof SelectPrimitive.Item>) {
+  return (
+    <SelectPrimitive.Item
+      className={cn(
+        'relative flex cursor-pointer select-none items-center rounded-md px-3 py-1.5 text-[13px] text-fg outline-none transition-colors data-[highlighted]:bg-surface-2 data-[state=checked]:text-accent',
+        className,
+      )}
+      {...props}
+    >
+      <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
+    </SelectPrimitive.Item>
+  )
+}
+
+export const SelectValue = SelectPrimitive.Value
+
+/* ─── Card ─── */
 export function Card({ className, ...props }: ComponentProps<'div'>) {
   return (
     <div className={cn('rounded-xl border border-border bg-surface', className)} {...props} />

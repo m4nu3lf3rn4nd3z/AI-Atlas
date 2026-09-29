@@ -74,7 +74,12 @@ export function LayerBand({ layer, onOpen }: { layer: Layer; onOpen: (id: string
         />
       </button>
 
-      {!collapsed && (
+      <div
+        className="grid transition-[grid-template-rows] duration-200 ease-out"
+        style={{ gridTemplateRows: collapsed ? '0fr' : '1fr' }}
+        aria-hidden={collapsed}
+      >
+        <div className="overflow-hidden">
         <div className="px-4 pb-4">
           <div className="divide-y divide-border/40 rounded-xl border border-border/40 bg-bg/30">
             {concepts.map((c) => {
@@ -126,7 +131,8 @@ export function LayerBand({ layer, onOpen }: { layer: Layer; onOpen: (id: string
             })}
           </div>
         </div>
-      )}
+        </div>
+      </div>
     </section>
   )
 }

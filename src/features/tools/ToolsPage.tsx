@@ -1,7 +1,7 @@
 import { ExternalLink, Search } from 'lucide-react'
 import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { Link, useLocation } from 'react-router'
-import { Badge } from '@/components/ui/primitives'
+import { Badge, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/primitives'
 import { casesUsingTool } from '@/cases'
 import { getConcept } from '@/content'
 import { LAYER_BY_ID } from '@/content/layers'
@@ -9,9 +9,6 @@ import { TOOL_CATEGORIES, TOOL_KIND_LABELS, TOOLS, TOOLS_AS_OF, type ToolCategor
 import { cn } from '@/lib/cn'
 
 const norm = (s: string) => s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase()
-
-const selectCls =
-  'h-9 cursor-pointer appearance-none rounded-lg border border-border bg-surface px-3 pr-8 text-[13px] text-fg outline-none transition-colors hover:border-border-strong focus:border-accent'
 
 export default function ToolsPage() {
   const [q, setQ] = useState('')
@@ -78,35 +75,34 @@ export default function ToolsPage() {
           />
         </label>
         <div className="mt-2.5 flex flex-wrap items-center gap-2">
-          <div className="relative">
-            <select
-              value={category}
-              onChange={(e) => {
-                setCategory(e.target.value as ToolCategoryId | 'all')
-                setKind('all')
-              }}
-              className={cn(selectCls, category !== 'all' && 'border-accent/60 bg-accent-soft')}
-            >
-              <option value="all">Todas las categorías</option>
+          <Select
+            value={category}
+            onValueChange={(v) => {
+              setCategory(v as ToolCategoryId | 'all')
+              setKind('all')
+            }}
+          >
+            <SelectTrigger active={category !== 'all'}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas las categorías</SelectItem>
               {TOOL_CATEGORIES.map((c) => (
-                <option key={c.id} value={c.id}>{c.title}</option>
+                <SelectItem key={c.id} value={c.id}>{c.title}</SelectItem>
               ))}
-            </select>
-            <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-subtle">▾</span>
-          </div>
-          <div className="relative">
-            <select
-              value={kind}
-              onChange={(e) => setKind(e.target.value as ToolKind | 'all')}
-              className={cn(selectCls, kind !== 'all' && 'border-accent/60 bg-accent-soft')}
-            >
-              <option value="all">Todos los tipos</option>
+            </SelectContent>
+          </Select>
+          <Select value={kind} onValueChange={(v) => setKind(v as ToolKind | 'all')}>
+            <SelectTrigger active={kind !== 'all'}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos los tipos</SelectItem>
               {availableKinds.map((k) => (
-                <option key={k} value={k}>{TOOL_KIND_LABELS[k]}</option>
+                <SelectItem key={k} value={k}>{TOOL_KIND_LABELS[k]}</SelectItem>
               ))}
-            </select>
-            <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-subtle">▾</span>
-          </div>
+            </SelectContent>
+          </Select>
           {(category !== 'all' || kind !== 'all') && (
             <button
               type="button"
