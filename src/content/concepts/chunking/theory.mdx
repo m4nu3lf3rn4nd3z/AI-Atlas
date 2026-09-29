@@ -1,0 +1,59 @@
+Antes de indexar documentos para <Concept id="rag">RAG</Concept> hay que trocearlos. Cada fragmento (<Term id="chunk">chunk</Term>) se convierte en una entrada del índice: la búsqueda devuelve fragmentos, no documentos, y el modelo solo ve lo que esos fragmentos contienen. Por eso el chunking es una de las decisiones que más influyen en la calidad de un sistema RAG, y una de las que más se deciden a ojo.
+
+## Por qué trocear
+
+- **Un vector por documento lo emborrona todo.** Un <Term id="embedding">embedding</Term> de un documento de 40 páginas es una media de muchos temas y no se parece mucho a ninguna pregunta concreta.
+- **El contexto del modelo es un presupuesto.** Recuperar el párrafo que responde es más barato, más rápido y menos distractor que pegar el documento entero.
+- **Los modelos de embedding tienen límite de entrada**, típicamente entre 512 y 8.192 tokens. Lo que pase de ahí se trunca en silencio.
+
+## La tensión central
+
+| | Fragmentos pequeños | Fragmentos grandes |
+|---|---|---|
+| Precisión de la búsqueda | Alta: el vector representa una sola idea | Baja: el vector mezcla varias ideas |
+| Contexto de cada fragmento | Poco: «este plazo es de 5 días», ¿qué plazo? | Mucho |
+| Fragmentos que caben en el prompt | Muchos | Pocos |
+| Riesgo | Partir la respuesta en dos | Diluirla entre texto irrelevante |
+
+No hay un tamaño óptimo universal. Entre 200 y 500 tokens es un punto de partida razonable para texto corrido, pero depende del tipo de documento, del modelo de embeddings y de cómo pregunta tu gente.
+
+## Estrategias
+
+| Estrategia | Cómo corta | Cuándo usarla |
+|---|---|---|
+| Tamaño fijo | Cada N tokens, sin mirar el contenido | Casi nunca: corta frases, tablas y código |
+| Recursiva | Párrafo → línea → frase → palabra, lo primero que quepa | El punto de partida por defecto |
+| Por frases | Agrupa frases completas | Prosa, transcripciones |
+| Por estructura | Encabezados de Markdown o HTML, funciones y clases en código | Documentación, manuales, código |
+| Semántica | Donde cambia el tema: la similitud entre frases consecutivas cae | Textos largos sin estructura |
+| Con un LLM | El modelo decide los cortes o reescribe el texto en proposiciones | Cuando la calidad compensa el coste |
+
+<Callout type="insight" title="El título de la sección es contexto gratis">
+Un fragmento que dice «se pueden trasladar hasta 5 días» no menciona la palabra *vacaciones*. Si se indexa con la ruta de títulos («Política de vacaciones › Días no disfrutados»), tanto la búsqueda léxica como la semántica lo encuentran mejor. En el lab puedes ver cómo la estrategia por estructura recupera respuestas que las demás pierden.
+</Callout>
+
+## Solape
+
+El solape repite el final de cada fragmento al principio del siguiente, para que una idea que cae justo en el corte aparezca entera en alguno de los dos. Un 10–20 % es habitual. No es gratis: duplica texto en el índice y en el prompt, y no sustituye a cortar por los límites naturales del texto. En la evaluación de Chroma (2024), un splitter recursivo bien parametrizado rindió a la altura de métodos mucho más complejos, y añadir solape no mejoró el recall.
+
+## Más allá del corte
+
+- **Contextual retrieval** (Anthropic, 2024): antes de indexar, un LLM escribe una o dos frases que sitúan cada fragmento en su documento y se anteponen al texto. En sus pruebas redujo los fallos de recuperación un 35 % con embeddings, un 49 % combinando embeddings y BM25, y un 67 % añadiendo <Concept id="reranking">re-ranking</Concept>.
+- **Small-to-big (padre-hijo)**: se indexan fragmentos pequeños para buscar con precisión, pero se devuelve la sección completa a la que pertenecen.
+- **Metadatos**: guarda con cada fragmento el documento, la sección, la URL y la fecha. Sirven para filtrar («solo la política vigente») y para citar la fuente.
+- **Late chunking**: se pasa el documento entero por un modelo de embeddings de contexto largo y después se promedian los vectores de cada fragmento, que así «saben» de qué documento vienen.
+
+<Callout type="warning" title="Basura entra, basura sale">
+Antes de trocear, hay que extraer bien el texto. Un PDF con dos columnas, cabeceras repetidas o tablas convertidas en líneas sueltas produce fragmentos sin sentido que ningún chunking arregla. Las tablas conviene convertirlas a Markdown conservando los encabezados de columna.
+</Callout>
+
+## Cómo elegir
+
+<Steps>
+  <Step title="Empieza simple">Recursivo o por estructura, 300–500 tokens, sin solape o con poco.</Step>
+  <Step title="Reúne preguntas reales">Unas decenas de preguntas con el fragmento que debería responderlas.</Step>
+  <Step title="Mide la recuperación">¿Está el fragmento correcto entre los primeros k? Compara tamaños y estrategias con esos números, no a ojo.</Step>
+  <Step title="Añade contexto">Títulos de sección, metadatos o contextual retrieval suelen dar más que afinar el tamaño.</Step>
+</Steps>
+
+En la pestaña **Lab** puedes trocear documentos reales con cada estrategia y comprobar qué preguntas encuentran su respuesta completa.

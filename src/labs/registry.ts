@@ -48,11 +48,12 @@ export const LABS: readonly LabInfo[] = [
   {
     id: 'chunking',
     title: 'Chunking',
-    short: 'Trocea un documento con 5 estrategias y compara los fragmentos.',
+    short: 'Trocea un documento con varias estrategias y comprueba si la búsqueda encuentra la respuesta completa.',
     concept: 'chunking',
     reality: 'real',
-    realityNote: 'Algoritmos reales de chunking.',
+    realityNote: 'Algoritmos reales de chunking, tokens contados con o200k y recuperación con BM25.',
     phase: 2,
+    Component: lazy(() => import('./chunking/ChunkingLab')),
   },
   {
     id: 'rag',
