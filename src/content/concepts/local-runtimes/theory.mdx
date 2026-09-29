@@ -1,0 +1,37 @@
+Ejecutar un modelo abierto en tu propio equipo ya no requiere compilar nada: un runtime local descarga el modelo, elige la cuantización, lo carga en la GPU (o en la CPU) y te da una API. Es la forma más directa de entender qué pasa por dentro de la inferencia, y en muchos casos una opción de producción razonable.
+
+## Por qué local
+
+- **Privacidad**: los datos no salen de tu máquina o de tu red.
+- **Sin conexión y sin límites de uso**: útil en entornos aislados o para procesar grandes volúmenes.
+- **Coste marginal casi nulo** una vez tienes el hardware.
+- **Control**: versión exacta del modelo, parámetros, cuantización.
+
+A cambio: los modelos que caben en un equipo de escritorio rinden por debajo de los mejores modelos de API, la velocidad depende de tu hardware y el mantenimiento es tuyo. Usa el lab de <Concept id="quantization">VRAM</Concept> para saber qué cabe en tu equipo antes de descargar nada.
+
+## Los runtimes
+
+| Runtime | Qué es | Cuándo |
+|---|---|---|
+| <Tool id="ollama" /> | Un comando para descargar y ejecutar modelos; API HTTP y compatibilidad con OpenAI | Empezar, prototipos, servicios internos sencillos |
+| <Tool id="llama-cpp" /> | El motor en C/C++ (y el formato GGUF) sobre el que se construyen muchos otros | Control fino, hardware poco común, descarga parcial a CPU |
+| <Tool id="lm-studio" /> | Aplicación de escritorio con interfaz gráfica | Explorar modelos sin terminal |
+| <Tool id="mlx" /> | Framework de Apple para su memoria unificada | Macs con Apple Silicon |
+| <Tool id="transformers-js" /> | Modelos ONNX en el navegador (WebAssembly o WebGPU) | IA dentro de una web, sin servidor, como los labs de esta app |
+| <Tool id="vllm" /> | Motor de serving para GPU | Si tienes una GPU dedicada y varios usuarios (ver <Concept id="serving-engines">serving</Concept>) |
+
+## Los mandos que importan
+
+- **Contexto** (`num_ctx` en Ollama, `-c` en llama.cpp): muchos runtimes arrancan con un contexto corto por defecto (Ollama usa 4.096 tokens) y **truncan en silencio** lo que no cabe. Si tu RAG o tu agente se comporta raro en local, revisa esto primero.
+- **Capas en GPU** (`-ngl` en llama.cpp): si el modelo no cabe entero en la VRAM, parte de las capas se quedan en la RAM y la CPU las procesa. Funciona, pero cada token tiene que pasar por la parte lenta.
+- **Cuantización**: la etiqueta del modelo (`qwen3:8b-q4_K_M`, `-q8_0`) decide memoria y calidad. Ver <Concept id="weight-formats">formatos</Concept>.
+- **Peticiones en paralelo**: cada conversación simultánea necesita su propio KV cache, así que más paralelismo es más memoria.
+- **Tiempo en memoria**: Ollama descarga el modelo tras 5 minutos sin uso; la siguiente petición paga la carga.
+
+<Callout type="insight" title="Una API, muchos motores">
+Ollama, llama.cpp, LM Studio y vLLM exponen endpoints compatibles con la API de Chat Completions de OpenAI. Cambiando la URL base, el mismo código habla con un modelo local o con uno en la nube. Es lo que permite prototipar en local y desplegar en otro sitio (ver <Concept id="llm-apis">APIs de LLM</Concept>).
+</Callout>
+
+<Callout type="warning" title="No expongas el runtime a Internet">
+Ollama escucha solo en `127.0.0.1` y no tiene autenticación. Si lo abres a la red (`OLLAMA_HOST=0.0.0.0`), cualquiera que llegue al puerto puede usar tu GPU, descargar modelos o borrarlos. Ponlo detrás de un proxy con autenticación o de una VPN.
+</Callout>

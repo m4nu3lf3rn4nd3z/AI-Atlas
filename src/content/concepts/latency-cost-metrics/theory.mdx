@@ -1,0 +1,46 @@
+Dos aplicaciones con el mismo modelo pueden sentirse y costar de forma muy distinta. Estas son las métricas que lo explican, y casi todas se derivan de algo que ya conoces: la inferencia tiene una fase de <Term id="prefill">prefill</Term> y otra de <Term id="decode">decode</Term> (ver <Concept id="context-window">ventana de contexto</Concept>).
+
+## Latencia
+
+| Métrica | Qué mide | Qué la mueve |
+|---|---|---|
+| <Term id="ttft">TTFT</Term> | Tiempo hasta el primer token | Longitud del prompt (prefill), cola del servidor, red, razonamiento previo, prompt caching |
+| TPOT / ITL | Tiempo entre tokens de salida | Tamaño del modelo y ancho de banda, carga del servidor, decodificación especulativa |
+| Latencia total | De la petición a la última palabra | TTFT + tokens de salida × TPOT |
+| Throughput | Tokens por segundo | Por usuario (lo que percibe cada uno) o del sistema (lo que sirve en total) |
+
+```
+latencia total ≈ TTFT + tokens de salida ÷ velocidad de salida
+```
+
+Con *streaming*, el usuario empieza a leer en el TTFT: una respuesta de 20 segundos se percibe como rápida si el primer token llega en medio segundo. Sin streaming, la espera es la latencia total.
+
+<Callout type="warning" title="El razonamiento cuenta como salida">
+Los <Concept id="reasoning-models">modelos de razonamiento</Concept> generan tokens de pensamiento antes de la respuesta visible. Esos tokens retrasan el primer token visible y se facturan como salida, aunque no se muestren. Controlar el esfuerzo de razonamiento es a menudo la palanca más grande de latencia y coste.
+</Callout>
+
+## Percentiles, no medias
+
+Una media de 2 segundos puede esconder que una de cada veinte peticiones tarda 15. Se mide el **p50** (lo típico), el **p95** y el **p99** (lo que sufren tus usuarios menos afortunados). Los objetivos de servicio se escriben en percentiles: «TTFT p95 < 1,5 s».
+
+## Coste
+
+Las APIs cobran por millón de tokens, con precios distintos para entrada y salida; la salida suele costar varias veces más. Además:
+
+- **En cada llamada se paga todo el contexto**: system prompt, definiciones de herramientas, documentos recuperados e historial. En un agente que da 30 vueltas, el prompt inicial se paga 30 veces.
+- **Prompt caching**: la parte del prompt que se repite idéntica al principio se cobra mucho más barata (en la API de Claude, las lecturas de caché cuestan el 10 % de la entrada normal). Ver <Concept id="inference-optimizations">optimizaciones</Concept>.
+- **Procesamiento por lotes**: si no hace falta la respuesta al momento, las APIs de batch cuestan la mitad.
+- **Imágenes y documentos** también se convierten en tokens de entrada.
+
+<CostLatencyCalculator />
+
+## Qué palanca mover
+
+| Si te sobra… | Prueba… |
+|---|---|
+| TTFT | Acortar el prompt, cachear el prefijo estable, menos razonamiento, un modelo más pequeño |
+| Tiempo de generación | Pedir respuestas más cortas, un modelo más rápido, streaming |
+| Coste de entrada | Caching, recuperar menos contexto, compactar el historial |
+| Coste de salida | Respuestas más concisas, menos razonamiento, batch para lo que puede esperar |
+
+En sistemas propios, el throughput y la latencia compiten: agrupar más peticiones por lote sube los tokens por segundo del servidor y baja los de cada usuario. Es lo que muestra el lab de <Concept id="quantization">VRAM</Concept> al subir las secuencias simultáneas, y lo que gestionan los <Concept id="serving-engines">motores de serving</Concept>.

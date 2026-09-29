@@ -1,0 +1,38 @@
+Generar texto con un LLM desperdicia hardware de forma sistemática: en el <Term id="decode">decode</Term> la GPU pasa la mayor parte del tiempo esperando a que lleguen los pesos desde la memoria, y el prompt se reprocesa entero en cada llamada. Las optimizaciones de inferencia atacan esos desperdicios. Algunas las aplicas tú; otras vienen dentro del runtime o del proveedor, pero conviene saber qué hacen para aprovecharlas.
+
+| Técnica | Ataca | Mejora | Dónde se aplica |
+|---|---|---|---|
+| Prompt / prefix caching | Reprocesar el mismo prefijo | TTFT y coste de entrada | API del proveedor, vLLM, SGLang |
+| <Term id="flash-attention">FlashAttention</Term> | Tráfico de memoria de la atención | Velocidad y memoria con contextos largos | Dentro del runtime |
+| Decodificación especulativa | Un token por pasada | Tokens por segundo | Runtime o proveedor |
+| <Concept id="quantization">Cuantización</Concept> | Bytes que leer por token | Memoria y velocidad de decode | Al elegir los pesos |
+| GQA / MLA | Tamaño del KV cache | Memoria, contextos largos, más usuarios | Arquitectura del modelo |
+| Continuous batching | GPU ociosa entre peticiones | Throughput del servidor | <Concept id="serving-engines">Motor de serving</Concept> |
+
+## Prompt caching
+
+Si dos peticiones empiezan por el mismo texto exacto, el KV cache de ese prefijo se puede reutilizar en lugar de recalcularlo. Los proveedores lo ofrecen como *prompt caching*; los motores propios, como *prefix caching*.
+
+<Callout type="insight" title="Ordena el prompt de lo estable a lo variable">
+La caché funciona por prefijo: basta un carácter distinto al principio para invalidarla. Pon primero lo que no cambia (definiciones de herramientas, instrucciones, documentos fijos) y al final lo que cambia en cada petición (la pregunta, la hora, el nombre del usuario).
+</Callout>
+
+En la API de Claude marcas hasta dónde cachear con `cache_control`: la primera petición escribe la caché (algo más cara que la entrada normal) y las siguientes la leen al 10 % del precio de entrada, con un TTL de 5 minutos que se renueva con cada uso (o de 1 hora, si lo pides). Hay un tamaño mínimo de prefijo que depende del modelo: por debajo, simplemente no se cachea.
+
+## FlashAttention
+
+La atención estándar construye una matriz de puntuaciones de tamaño longitud × longitud y la escribe en la memoria lenta de la GPU. FlashAttention calcula exactamente lo mismo por bloques que caben en la memoria rápida del chip, sin materializar la matriz completa. El resultado es idéntico; la diferencia es de velocidad y de memoria, sobre todo con contextos largos. Hoy viene activada en casi todos los runtimes.
+
+## Decodificación especulativa
+
+Un modelo pequeño y rápido (el *borrador*) propone varios tokens seguidos, y el modelo grande los verifica todos en una sola pasada, que cuesta casi lo mismo que generar uno. Se aceptan los tokens hasta el primero en que el grande no está de acuerdo. Con el esquema de aceptación adecuado, la distribución de la salida es **exactamente** la del modelo grande: no se pierde calidad, se gana velocidad cuando el borrador acierta a menudo (código, texto predecible, respuestas con plantilla).
+
+Variantes: cabezas de predicción adicionales en el propio modelo (Medusa, EAGLE) o búsqueda de n-gramas en el prompt (útil al editar texto que ya está en el contexto).
+
+## Menos KV cache por diseño
+
+La atención con consultas agrupadas (<Term id="gqa">GQA</Term>) comparte keys y values entre varias cabezas; la atención latente (MLA, DeepSeek) los comprime en un vector pequeño; las ventanas deslizantes y las capas de atención lineal limitan cuánto crece la caché con el contexto. Puedes comparar el efecto de cada diseño en el lab de <Concept id="quantization">VRAM</Concept>, con las arquitecturas reales de Llama, Gemma, Qwen y DeepSeek.
+
+<Callout type="warning" title="Caché semántica: con cuidado">
+Guardar respuestas y devolverlas ante preguntas «parecidas» (por similitud de embeddings) ahorra llamadas, pero puede servir una respuesta que no corresponde: «¿puedo devolverlo?» y «¿puedo devolverlo si está abierto?» se parecen mucho. Úsala solo con umbrales estrictos y en contenidos donde un error sea barato.
+</Callout>

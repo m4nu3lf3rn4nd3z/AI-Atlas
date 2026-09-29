@@ -1,0 +1,39 @@
+Servir un modelo a cientos de usuarios a la vez es otro problema que ejecutarlo para uno. Con una sola conversación, la GPU pasa casi todo el tiempo esperando a la memoria (ver <Concept id="latency-cost-metrics">latencia y coste</Concept>). Con muchas, la clave es **procesarlas juntas**: en cada paso de decode se leen los pesos una vez y se generan tokens para todas las secuencias del lote. Los motores de serving existen para hacer eso bien.
+
+## Continuous batching
+
+El batching estático agrupa peticiones, las procesa hasta que termina la más larga y solo entonces admite otras: las que acaban pronto dejan huecos. Con **continuous batching** (o *in-flight batching*), el lote se recompone en cada paso: una secuencia que termina sale y otra entra inmediatamente. La GPU se mantiene ocupada y el throughput se multiplica.
+
+## PagedAttention: el KV cache como memoria virtual
+
+Cada secuencia necesita su KV cache, que crece token a token y cuyo tamaño final no se conoce de antemano. Reservar el máximo para cada petición desperdicia la mayor parte de la memoria. PagedAttention, la idea central de <Tool id="vllm" />, reparte el KV cache en **bloques de tamaño fijo** que se asignan bajo demanda, como las páginas de la memoria virtual de un sistema operativo. Casi no se desperdicia memoria, caben más secuencias por lote y los bloques de un prefijo común se pueden **compartir** entre peticiones.
+
+## Reutilizar prefijos
+
+Si muchas peticiones comparten el principio (el mismo system prompt, las mismas herramientas, los mismos ejemplos), su KV cache se calcula una vez y se reutiliza: *automatic prefix caching* en vLLM, *RadixAttention* en <Tool id="sglang" />. Es el equivalente propio del prompt caching de los proveedores, y aporta mucho en agentes y RAG.
+
+## Más de una GPU
+
+| Paralelismo | Qué reparte | Para qué |
+|---|---|---|
+| De datos (réplicas) | Copias completas del modelo | Más usuarios, si el modelo cabe en una GPU |
+| Tensorial | Cada capa entre varias GPUs del mismo nodo | Modelos que no caben en una GPU; baja la latencia |
+| De pipeline | Grupos de capas entre nodos | Modelos enormes, varios nodos |
+| De expertos | Los expertos de un MoE entre GPUs | Modelos MoE grandes |
+
+Los despliegues más avanzados separan además el **prefill** y el **decode** en grupos de GPUs distintos, porque uno está limitado por cómputo y el otro por memoria.
+
+## Throughput frente a latencia
+
+Lotes más grandes suben los tokens por segundo del servidor y bajan los de cada usuario, y alargan la cola de espera. El ajuste se hace contra objetivos de servicio: por ejemplo, TTFT p95 por debajo de 1 s y más de 30 tokens/s por usuario. Lo que importa no es el throughput máximo sino el que se consigue **cumpliendo esos objetivos** (a veces llamado *goodput*).
+
+## Los motores
+
+- <Tool id="vllm" />: el estándar de facto en código abierto, con servidor compatible con OpenAI.
+- <Tool id="sglang" />: rápido y muy eficiente con prefijos compartidos.
+- <Tool id="tensorrt-llm" />: máximo rendimiento en GPUs NVIDIA, a cambio de más complejidad.
+- <Tool id="llama-cpp" />: para CPU, equipos modestos o pocos usuarios.
+
+<Callout type="tradeoff" title="¿Servir tú o usar una API?">
+Servir modelos abiertos te da control, privacidad y un coste por token que puede ser muy bajo con uso alto y constante. También te da GPUs caras ociosas por la noche, tiempos de arranque de minutos (cargar decenas de GB de pesos), actualizaciones de drivers y guardias. Por debajo de cierto volumen, o con tráfico muy variable, una API suele salir más barata en total.
+</Callout>

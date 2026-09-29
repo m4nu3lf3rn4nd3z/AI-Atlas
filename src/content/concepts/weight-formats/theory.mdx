@@ -1,0 +1,43 @@
+Un modelo abierto no es un fichero: es una carpeta con los pesos, la arquitectura, el tokenizador y la plantilla de chat. El **formato** de esos pesos decide qué runtime puede cargarlos, si es seguro abrirlos y si ya vienen <Concept id="quantization">cuantizados</Concept>.
+
+## Anatomía de un modelo en Hugging Face
+
+| Fichero | Qué contiene |
+|---|---|
+| `config.json` | La arquitectura: capas, cabezas, dimensiones, contexto máximo. Es lo que usa el lab de VRAM |
+| `model.safetensors` (o varios fragmentos + `.index.json`) | Los pesos |
+| `tokenizer.json`, `tokenizer_config.json` | El vocabulario y la **plantilla de chat** |
+| `generation_config.json` | Los parámetros de muestreo recomendados por el autor |
+
+<Callout type="warning" title="La plantilla de chat importa">
+Un modelo instruct se entrenó con un formato concreto de turnos y tokens especiales. Si se le envía la conversación con otra plantilla, responde peor o de forma extraña, sin ningún error. Los runtimes la leen del tokenizador; en GGUF va dentro del fichero.
+</Callout>
+
+## Los formatos
+
+| Formato | Qué es | Lo cargan |
+|---|---|---|
+| **safetensors** | El estándar de Hugging Face: una cabecera JSON con la posición de cada tensor y los datos en bruto. Seguro y rápido de cargar | Transformers, vLLM, SGLang, MLX y casi todo |
+| **Pickle** (`.bin`, `.pt`, `.pth`) | El formato serializado de PyTorch | PyTorch. **Puede ejecutar código al cargarse** |
+| **GGUF** | Un solo fichero con pesos (normalmente cuantizados), tokenizador, plantilla y metadatos | llama.cpp, Ollama, LM Studio |
+| **ONNX** | El grafo de cálculo más los pesos, independiente del framework | ONNX Runtime, Transformers.js (navegador) |
+| **MLX** | Pesos para el framework de Apple | MLX, LM Studio en Mac |
+| **Checkpoints cuantizados** | safetensors con enteros empaquetados y escalas: GPTQ, AWQ, FP8, MXFP4… | vLLM, SGLang, TensorRT-LLM, Transformers |
+| **Motores de TensorRT** | El modelo compilado para una GPU y una configuración concretas | TensorRT-LLM |
+
+<Callout type="warning" title="Un modelo también es una superficie de ataque">
+Cargar un fichero pickle de un desconocido equivale a ejecutar su código. Prefiere safetensors, descarga de organizaciones de confianza, fija la versión (el *commit*) que has revisado y evita `trust_remote_code=True` salvo que hayas leído ese código. La sección de [seguridad](/security) cubre estos ataques a la cadena de suministro.
+</Callout>
+
+## Cómo elegir
+
+- **Vas a servir en GPU con vLLM o SGLang**: safetensors, en BF16, FP8 o un checkpoint AWQ/GPTQ si necesitas ahorrar memoria.
+- **Vas a ejecutar en local con Ollama o llama.cpp**: GGUF, eligiendo la cuantización (Q4_K_M como punto de partida).
+- **En un Mac**: GGUF o MLX.
+- **En el navegador o en un móvil**: ONNX.
+
+Muchos modelos populares tienen versiones en todos estos formatos publicadas por el autor o por la comunidad. Comprueba quién la ha convertido y con qué cuantización.
+
+<Callout type="insight" title="Leer sin descargar">
+La cabecera de un safetensors dice el nombre, el tipo y la posición de cada tensor. Con una petición HTTP de rango se puede leer solo la cabecera, o un único tensor, de un modelo de varios GB. Así obtiene el lab de VRAM los pesos reales de Qwen2.5 que cuantiza.
+</Callout>

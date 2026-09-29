@@ -1,5 +1,6 @@
 import { Anchor, Callout, Concept, Diagram, Figure, Pre, Step, Steps, Term } from './mdx'
 import { ToolChip } from './ToolChip'
+import { CostLatencyCalculator } from './widgets/CostLatencyCalculator'
 import { SoftmaxPlayground } from './widgets/SoftmaxPlayground'
 import { TokenPreview } from './widgets/TokenPreview'
 
@@ -17,4 +18,5 @@ export const mdxComponents = {
   Tool: ToolChip,
   TokenPreview,
   SoftmaxPlayground,
+  CostLatencyCalculator,
 }
