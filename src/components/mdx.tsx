@@ -116,6 +116,22 @@ export function Diagram({ name, caption }: { name: keyof typeof DIAGRAMS; captio
   )
 }
 
+/** Markdown links: internal paths go through the router, external ones open in a new tab. */
+export function Anchor({ href = '', children, ...props }: ComponentProps<'a'>) {
+  if (href.startsWith('/')) {
+    return (
+      <Link to={href} className={props.className}>
+        {children}
+      </Link>
+    )
+  }
+  return (
+    <a href={href} target="_blank" rel="noreferrer" {...props}>
+      {children}
+    </a>
+  )
+}
+
 /** Fenced code blocks in MDX render through the shared CodeBlock. */
 export function Pre(props: ComponentProps<'pre'>) {
   const child = props.children

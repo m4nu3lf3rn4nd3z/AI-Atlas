@@ -24,6 +24,7 @@ export const TOOL_CATEGORIES = [
   { id: 'ui', title: 'Interfaces de agentes', description: 'Cómo el usuario habla con el agente y ve lo que hace.' },
   { id: 'hitl', title: 'Humano en el bucle', description: 'Canales donde una persona aprueba, corrige o recibe el trabajo del agente.' },
   { id: 'saas', title: 'SaaS conectados vía MCP', description: 'Los servicios que más se conectan a asistentes y agentes.' },
+  { id: 'inference', title: 'Modelos e inferencia', description: 'Dónde se consiguen los modelos y con qué se ejecutan, del portátil al clúster.' },
 ] as const
 
 export type ToolCategoryId = (typeof TOOL_CATEGORIES)[number]['id']
@@ -37,8 +38,10 @@ export type ToolKind =
   | 'pattern'
   | 'building-block'
   | 'saas'
+  | 'app'
 
 export const TOOL_KIND_LABELS: Record<ToolKind, string> = {
+  app: 'Aplicación',
   'open-source': 'Open source',
   'open-core': 'Open source + cloud',
   managed: 'Servicio gestionado',
@@ -144,6 +147,9 @@ export const TOOLS: Tool[] = [
   { id: 'elasticsearch', name: 'Elasticsearch', categories: ['vector-db', 'rag'], kind: 'open-core', description: 'Motor de búsqueda con BM25 de primera clase y búsqueda vectorial: la base natural para la búsqueda híbrida.', url: 'https://www.elastic.co/elasticsearch', concepts: ['hybrid-search'] },
   { id: 'opensearch', name: 'OpenSearch', categories: ['vector-db', 'rag'], kind: 'open-source', description: 'Fork open source de Elasticsearch con búsqueda léxica, vectorial e híbrida.', url: 'https://opensearch.org', concepts: ['hybrid-search'] },
 
+  { id: 'faiss', name: 'FAISS', categories: ['vector-db', 'inference'], kind: 'open-source', description: 'Librería de Meta para buscar vecinos entre vectores densos: índices exactos, IVF, PQ y HNSW, en CPU y GPU. No es una base de datos: no gestiona metadatos ni persistencia por ti.', choose: 'Búsqueda vectorial embebida en tu proceso, o para experimentar con índices.', url: 'https://github.com/facebookresearch/faiss', concepts: ['ann-indexes'] },
+  { id: 'lancedb', name: 'LanceDB', categories: ['vector-db'], kind: 'open-core', description: 'Base vectorial embebida, sin servidor, sobre el formato columnar Lance: búsqueda vectorial, de texto completo e híbrida sobre ficheros locales o en S3.', choose: 'Prototipos y aplicaciones que quieren una base vectorial «como SQLite».', url: 'https://lancedb.com', concepts: ['vector-databases'] },
+
   // ── RAG ───────────────────────────────────────────────────────────────
   { id: 'unstructured', name: 'Unstructured', categories: ['rag'], kind: 'open-core', description: 'Convierte PDFs, Word, HTML, emails e imágenes en elementos limpios (títulos, tablas, texto) listos para trocear.', url: 'https://unstructured.io', concepts: ['chunking'] },
   { id: 'llamaparse', name: 'LlamaParse', categories: ['rag'], kind: 'managed', description: 'Parsing de documentos complejos (tablas, gráficos, maquetación) de LlamaIndex, pensado para RAG.', url: 'https://www.llamaindex.ai/llamaparse', concepts: ['chunking', 'multimodality'] },
@@ -225,6 +231,20 @@ export const TOOLS: Tool[] = [
   { id: 'hubspot', name: 'HubSpot', categories: ['saas'], kind: 'saas', description: 'CRM y marketing para pymes: contactos, oportunidades y tickets accesibles para agentes.', url: 'https://www.hubspot.com' },
   { id: 'stripe', name: 'Stripe', categories: ['saas'], kind: 'saas', description: 'Pagos: clientes, facturas y reembolsos. Tiene servidor MCP oficial; sus acciones de escritura requieren mucho cuidado.', url: 'https://stripe.com' },
   { id: 'sentry', name: 'Sentry', categories: ['saas'], kind: 'saas', description: 'Errores y rendimiento de tus apps; con su servidor MCP un agente de código lee el stack trace real de un fallo.', url: 'https://sentry.io' },
+
+  // ── Modelos e inferencia ──────────────────────────────────────────────
+  { id: 'hugging-face-hub', name: 'Hugging Face Hub', categories: ['inference'], kind: 'managed', description: 'El repositorio central de modelos, datasets y demos (Spaces) del ecosistema abierto, con model cards, licencias y versiones por commit.', choose: 'Para encontrar, descargar y publicar pesos abiertos.', url: 'https://huggingface.co', concepts: ['hugging-face', 'open-vs-closed'] },
+  { id: 'transformers', name: 'Transformers', categories: ['inference'], kind: 'open-source', description: 'La librería de Hugging Face para cargar, ejecutar y ajustar la mayoría de modelos abiertos con PyTorch.', choose: 'Investigación, fine-tuning y prototipos; para servir a muchos usuarios, un motor de serving.', url: 'https://github.com/huggingface/transformers', concepts: ['hugging-face', 'fine-tuning'] },
+  { id: 'sentence-transformers', name: 'Sentence Transformers', categories: ['inference', 'rag'], kind: 'open-source', description: 'Calcula embeddings y ejecuta cross-encoders (rerankers) con miles de modelos preentrenados, y permite ajustarlos a tu dominio.', url: 'https://www.sbert.net', concepts: ['embedding-models', 'reranking'] },
+  { id: 'ollama', name: 'Ollama', categories: ['inference'], kind: 'open-source', description: 'Ejecuta modelos abiertos en local con un comando: gestiona descargas y cuantizaciones y expone una API HTTP, también compatible con la de OpenAI. Construido sobre GGML, la base de llama.cpp.', choose: 'La forma más rápida de tener un modelo local funcionando.', url: 'https://ollama.com', concepts: ['local-runtimes'] },
+  { id: 'llama-cpp', name: 'llama.cpp', categories: ['inference'], kind: 'open-source', description: 'Motor de inferencia en C/C++ para CPU y GPU (CUDA, Metal, Vulkan…) y creador del formato GGUF. Incluye llama-server, con API compatible con OpenAI.', choose: 'Control fino del runtime local, hardware poco común o descarga parcial a CPU.', url: 'https://github.com/ggml-org/llama.cpp', concepts: ['local-runtimes', 'weight-formats', 'quantization'] },
+  { id: 'lm-studio', name: 'LM Studio', categories: ['inference'], kind: 'app', description: 'Aplicación de escritorio para descargar, probar y servir modelos locales (GGUF y MLX) con una API local.', choose: 'Explorar modelos locales sin terminal.', url: 'https://lmstudio.ai', concepts: ['local-runtimes'] },
+  { id: 'mlx', name: 'MLX', categories: ['inference'], kind: 'open-source', description: 'Framework de arrays de Apple para Apple Silicon. Con mlx-lm se ejecutan y ajustan LLMs aprovechando la memoria unificada.', choose: 'Modelos locales en un Mac.', url: 'https://github.com/ml-explore/mlx', concepts: ['local-runtimes', 'weight-formats'] },
+  { id: 'vllm', name: 'vLLM', categories: ['inference'], kind: 'open-source', description: 'Motor de serving de alto rendimiento: PagedAttention, continuous batching, prefix caching, cuantización y servidor compatible con OpenAI.', choose: 'Servir modelos abiertos a muchos usuarios en GPU.', url: 'https://github.com/vllm-project/vllm', concepts: ['serving-engines', 'inference-optimizations'] },
+  { id: 'sglang', name: 'SGLang', categories: ['inference'], kind: 'open-source', description: 'Motor de serving rápido con RadixAttention, que reutiliza prefijos comunes entre peticiones, y un lenguaje para programas LLM estructurados.', choose: 'Cargas con muchos prefijos compartidos: agentes, few-shot, RAG.', url: 'https://github.com/sgl-project/sglang', concepts: ['serving-engines', 'inference-optimizations'] },
+  { id: 'tensorrt-llm', name: 'TensorRT-LLM', categories: ['inference'], kind: 'open-source', description: 'Librería de NVIDIA que optimiza modelos para sus GPUs: kernels específicos, FP8 y FP4, batching en vuelo y decodificación especulativa.', choose: 'Exprimir hardware NVIDIA en producción.', url: 'https://github.com/NVIDIA/TensorRT-LLM', concepts: ['serving-engines', 'quantization'] },
+  { id: 'onnx-runtime', name: 'ONNX Runtime', categories: ['inference'], kind: 'open-source', description: 'Runtime multiplataforma para modelos en formato ONNX: CPU, GPU, móvil y navegador (WebAssembly y WebGPU).', url: 'https://onnxruntime.ai', concepts: ['weight-formats'] },
+  { id: 'transformers-js', name: 'Transformers.js', categories: ['inference'], kind: 'open-source', description: 'Modelos de Hugging Face en JavaScript, sobre ONNX Runtime: en el navegador o en Node, sin servidor. Es lo que usan los labs de embeddings de esta app.', choose: 'IA en el navegador: privacidad, cero coste de servidor, funciona sin conexión.', url: 'https://huggingface.co/docs/transformers.js', concepts: ['embedding-models', 'local-runtimes'] },
 ]
 
 export const TOOL_BY_ID: ReadonlyMap<string, Tool> = new Map(TOOLS.map((t) => [t.id, t]))

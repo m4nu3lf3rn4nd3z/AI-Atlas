@@ -1,0 +1,51 @@
+Buscar los vectores más cercanos a una pregunta parece trivial: calcular la distancia a todos y quedarse con los *k* mejores. Con 10.000 fragmentos es exactamente lo que conviene hacer. Con 100 millones de vectores de 1.024 dimensiones son unos cien mil millones de multiplicaciones por consulta. Los índices <Term id="ann">ANN</Term> (*Approximate Nearest Neighbors*) encuentran casi siempre los mismos vecinos visitando una fracción mínima de los vectores.
+
+## Exacto frente a aproximado
+
+La búsqueda exacta (*brute force*, «flat») siempre acierta y su coste crece con el número de vectores. Un índice ANN renuncia a una pequeña parte de los resultados correctos a cambio de ser órdenes de magnitud más rápido. Esa parte se mide con el **recall@k**: qué fracción de los *k* vecinos verdaderos devuelve el índice.
+
+<Callout type="insight" title="Muchas veces no necesitas un índice">
+Hasta unas decenas o cientos de miles de vectores, la búsqueda exacta tarda milisegundos y no tiene nada que ajustar. Los índices ANN compensan cuando el volumen o la latencia lo exigen.
+</Callout>
+
+## Las familias
+
+### Grafos: HNSW
+
+*Hierarchical Navigable Small World* conecta cada vector con sus vecinos formando un grafo, en varias capas: las de arriba tienen pocos nodos y saltos largos, la de abajo los tiene todos. La búsqueda baja de capa en capa acercándose con avidez a la consulta.
+
+<Diagram name="hnsw" />
+
+- `M`: cuántos vecinos guarda cada nodo. Más, mejor recall y más memoria.
+- `ef_construction`: esfuerzo al construir. Más, mejor grafo y construcción más lenta.
+- `ef_search`: cuántos candidatos explora cada consulta. **Es el mando de recall frente a latencia** y se cambia sin reconstruir.
+
+Es el índice más usado: buen recall, admite inserciones y no necesita entrenamiento. A cambio, todo el grafo debe caber en RAM. Variantes como DiskANN lo llevan a disco para miles de millones de vectores.
+
+### Particiones: IVF
+
+Se agrupan los vectores con k-means en `nlist` celdas. Cada consulta solo examina las `nprobe` celdas más cercanas. Más `nprobe`, más recall y más lentitud. Necesita entrenarse con una muestra de los datos.
+
+### Compresión: PQ y cuantización
+
+*Product Quantization* parte cada vector en trozos y sustituye cada trozo por el índice del centroide más cercano: un vector de 1.024 floats (4 KB) puede quedar en 64 bytes. Las distancias se aproximan con tablas precalculadas. Se combina con IVF (IVF-PQ) para colecciones enormes, y se suele reordenar a los mejores candidatos con los vectores originales. La cuantización escalar (int8) y la binaria son versiones más simples de la misma idea.
+
+| Índice | Memoria | Recall | Actualizaciones | Cuándo |
+|---|---|---|---|---|
+| Exacto | Vectores completos | 100 % | Triviales | Hasta cientos de miles |
+| HNSW | Vectores + grafo | Muy alto | Buenas; borrar es delicado | El caso general |
+| IVF | Vectores + centroides | Alto | Requiere reentrenar si cambia la distribución | Colecciones grandes |
+| IVF-PQ | Muy baja | Medio (alto con reordenación) | Igual que IVF | Miles de millones de vectores |
+
+## Filtros: donde se complica
+
+Pedir «los vecinos más cercanos que además sean del cliente X y de 2026» no es trivial. Filtrar **después** de buscar puede dejarte con menos de *k* resultados; filtrar **durante** el recorrido del grafo puede romper la navegación si el filtro es muy selectivo. Las <Concept id="vector-databases">bases vectoriales</Concept> maduras resuelven esto combinando índices de metadatos, búsqueda exacta sobre subconjuntos pequeños y recorridos del grafo que respetan el filtro. Si tu caso depende de filtros, pruébalo con ellos.
+
+## En la práctica
+
+<Steps>
+  <Step title="Empieza exacto o con HNSW por defecto">Los valores por defecto de <Tool id="pgvector" />, <Tool id="qdrant" /> o <Tool id="faiss" /> suelen ser razonables.</Step>
+  <Step title="Mide el recall">Compara los resultados del índice con la búsqueda exacta sobre unas cientos de consultas reales.</Step>
+  <Step title="Ajusta ef_search o nprobe">Súbelo hasta el recall que necesites y comprueba la latencia en el percentil 95, no en la media.</Step>
+  <Step title="Comprime si la memoria manda">int8, binario o PQ, con reordenación de los mejores candidatos.</Step>
+</Steps>

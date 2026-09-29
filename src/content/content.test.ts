@@ -16,6 +16,7 @@ import {
 } from './index'
 import { LAYERS } from './layers'
 import { PATHS } from './paths'
+import { TOOL_BY_ID } from './tools'
 import { conceptDetailsSchema, conceptMetaSchema, glossaryTermSchema, learningPathSchema } from './schema'
 
 describe('concept metadata', () => {
@@ -108,6 +109,9 @@ describe('written content', () => {
     }
     for (const [, name] of src.matchAll(/<Diagram name="([^"]+)"/g)) {
       expect(name! in DIAGRAMS, `Diagram ${name}`).toBe(true)
+    }
+    for (const [, tool] of src.matchAll(/<Tool id="([^"]+)"/g)) {
+      expect(TOOL_BY_ID.has(tool!), `Tool ${tool}`).toBe(true)
     }
     // Every snippet file in the folder is actually used by details.ts
     const detailsSrc = readFileSync(join(dir, 'details.ts'), 'utf8')

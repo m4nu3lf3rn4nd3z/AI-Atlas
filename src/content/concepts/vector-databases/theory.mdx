@@ -1,0 +1,52 @@
+Un <Concept id="ann-indexes">índice ANN</Concept> sabe encontrar vecinos. Una base de datos vectorial añade todo lo que necesita un sistema en producción: guardar los vectores con sus datos, actualizarlos y borrarlos, filtrar por metadatos, combinar con búsqueda de texto, repartir la carga y controlar quién ve qué.
+
+## Qué aporta sobre una librería
+
+| Necesidad | Librería (p. ej. <Tool id="faiss" />) | Base vectorial |
+|---|---|---|
+| Buscar vecinos | Sí | Sí |
+| Persistencia, copias de seguridad | Tú | Incluido |
+| Metadatos y filtros | Tú | Filtros integrados en la búsqueda |
+| Altas, bajas y cambios | Limitado | Upserts y borrados |
+| Búsqueda híbrida (texto + vectores) | No | Muchas la incluyen |
+| Varios clientes o equipos | Tú | Colecciones, particiones, permisos |
+
+## Las opciones
+
+**Usar lo que ya tienes.** <Tool id="pgvector" /> convierte PostgreSQL en una base vectorial: tus vectores viven junto a tus tablas, con transacciones, joins y copias de seguridad que ya sabes gestionar. <Tool id="elasticsearch" /> y <Tool id="opensearch" /> añaden vectores a un motor que ya domina la búsqueda de texto. Para muchos equipos, hasta varios millones de vectores, esto basta.
+
+**Una base dedicada.** <Tool id="qdrant" />, <Tool id="weaviate" />, <Tool id="milvus" /> o <Tool id="pinecone" /> están pensadas para colecciones grandes, filtros exigentes, varios vectores por documento (denso y disperso) y escalado horizontal.
+
+**Embebida.** <Tool id="chroma" /> o <Tool id="lancedb" /> se usan como una librería, sin servidor: ideales para prototipos, aplicaciones de escritorio o pipelines de datos.
+
+<Callout type="tradeoff">
+Una pieza más en tu arquitectura es otra cosa que operar, monitorizar y sincronizar con tu fuente de verdad. Empieza por lo que ya tienes y cambia cuando el volumen, la latencia o los filtros lo justifiquen.
+</Callout>
+
+## El modelo de datos
+
+Cada entrada (*punto*, *registro*) suele llevar:
+
+- Un **id** estable, que permita actualizar o borrar el fragmento cuando cambia su documento.
+- Uno o varios **vectores**: el denso del modelo de embeddings y, a veces, uno disperso para la <Concept id="hybrid-search">búsqueda híbrida</Concept>.
+- **Metadatos** (*payload*): documento de origen, sección, fecha, idioma, cliente, permisos, versión del modelo de embeddings.
+- El **texto** del fragmento, o una referencia para recuperarlo.
+
+<Callout type="note" title="Cambiar de modelo de embeddings">
+Los vectores de modelos distintos no son comparables. Para migrar, se crea una colección nueva, se rellena en paralelo y se cambia el alias o la configuración de golpe. Guardar la versión del modelo en los metadatos evita mezclas.
+</Callout>
+
+## Varios clientes y seguridad
+
+Si varios clientes comparten índice, cada búsqueda debe llevar su filtro de cliente, aplicado en el servidor y no en el prompt. Hay dos enfoques: una colección por cliente (aislamiento fuerte, más sobrecarga) o una colección compartida con un campo de cliente indexado (más eficiente, exige no olvidarse nunca del filtro).
+
+<Callout type="warning" title="Un embedding no es un dato anónimo">
+Se ha demostrado que a partir de un embedding se puede reconstruir buena parte del texto original. Trátalos con el mismo nivel de protección que el texto: cifrado, control de acceso y borrado cuando se borra el documento. La sección de [seguridad](/security) detalla estos riesgos (OWASP LLM08).
+</Callout>
+
+## Operar en producción
+
+- **Actualizaciones**: re-indexa los fragmentos de un documento cuando cambia; borra los de documentos eliminados. Los índices HNSW gestionan mal los borrados masivos y necesitan compactarse.
+- **Memoria**: HNSW guarda vectores y grafo en RAM. La cuantización de vectores o los índices en disco reducen el coste.
+- **Latencia**: mide el percentil 95 con los filtros reales, no la media sin filtros.
+- **Fuente de verdad**: la base vectorial es un índice derivado. Debe poder reconstruirse desde tus documentos.

@@ -1,0 +1,51 @@
+La búsqueda por embeddings entiende que «caja rota» y «paquete dañado» significan lo mismo, pero puede fallar con «error E-4012». La búsqueda por palabras acierta con el código y falla con la paráfrasis. La búsqueda híbrida ejecuta las dos y combina sus resultados.
+
+## BM25 por dentro
+
+BM25 es el algoritmo clásico de búsqueda por palabras, el que usan Elasticsearch, OpenSearch y Lucene por defecto. Para cada término de la consulta suma:
+
+```
+IDF(término) × tf × (k1 + 1) / (tf + k1 × (1 − b + b × longitud / longitud_media))
+```
+
+- **IDF**: los términos raros pesan mucho («E-4012») y los comunes casi nada («envío» en una base de conocimiento de logística).
+- **Saturación (k1 ≈ 1,2)**: repetir una palabra diez veces no hace un documento diez veces más relevante.
+- **Longitud (b ≈ 0,75)**: un documento largo contiene más palabras por azar, así que se penaliza un poco.
+
+<Callout type="warning" title="BM25 depende del analizador de texto">
+Antes de contar, el texto se normaliza: minúsculas, acentos, palabras vacías y *stemming* («devoluciones» → «devolucion»). Con un analizador para inglés, un texto en español pierde mucho. Configura el idioma (`spanish` en Elasticsearch o en PostgreSQL) y comprueba cómo trocea tus términos técnicos.
+</Callout>
+
+## Búsqueda dispersa aprendida
+
+Modelos como SPLADE generan vectores **dispersos**: un peso por palabra del vocabulario, casi todos cero, como BM25, pero aprendidos y con **expansión**: el vector de «coche» incluye también «vehículo» o «automóvil» con cierto peso. Se sirven con índices invertidos, así que conservan la eficiencia de la búsqueda léxica y ganan parte de la comprensión semántica.
+
+## Cómo se fusionan dos rankings
+
+Las puntuaciones de BM25 (0 a 20, sin techo) y de coseno (0,7 a 0,95) no son comparables. Hay dos estrategias:
+
+| Método | Cómo | Ventajas | Inconvenientes |
+|---|---|---|---|
+| RRF | Cada documento suma 1 / (60 + posición) en cada lista | No hay que calibrar nada; robusto | Ignora cuánto mejor es el primero que el segundo |
+| Combinación ponderada | Normalizar las puntuaciones (min-max, z-score) y mezclar: α · denso + (1 − α) · léxico | Aprovecha las puntuaciones; puede rendir más | Hay que ajustar α con datos |
+
+<Callout type="insight" title="Híbrido no siempre gana">
+Si una de las dos listas es mala para tus preguntas, la fusión puede empeorar a la mejor. En el lab de RAG, con esa base de conocimiento, la búsqueda densa sola supera a la híbrida con RRF. En corpus con muchos códigos, nombres propios o jerga, suele ser al revés. Mídelo con tus preguntas.
+</Callout>
+
+## Dónde se implementa
+
+- **Motores de búsqueda**: <Tool id="elasticsearch" /> y <Tool id="opensearch" /> combinan BM25 y vectores, con RRF incluido.
+- **Bases vectoriales**: <Tool id="qdrant" />, <Tool id="weaviate" /> o <Tool id="milvus" /> guardan vectores densos y dispersos en el mismo punto y los fusionan en una consulta.
+- **PostgreSQL**: búsqueda de texto completo (`tsvector`) más <Tool id="pgvector" />, fusionados en SQL.
+
+## Cuándo compensa
+
+<Steps>
+  <Step title="Mide primero la búsqueda densa sola">Con un conjunto de preguntas reales y su documento correcto.</Step>
+  <Step title="Mira dónde falla">Si falla con códigos, referencias, nombres o cifras, la parte léxica ayudará.</Step>
+  <Step title="Añade BM25 con el analizador correcto">Idioma, stemming y, si hace falta, tratamiento especial de códigos.</Step>
+  <Step title="Compara RRF y combinación ponderada">Y quédate con lo que mejore tus métricas, no con lo que prometa un benchmark.</Step>
+</Steps>
+
+Después de fusionar, un <Concept id="reranking">reranker</Concept> suele aportar más que afinar la fusión.

@@ -1,0 +1,41 @@
+Un <Concept id="rag">RAG</Concept> básico hace una búsqueda y responde. Las técnicas avanzadas atacan sus fallos concretos: preguntas mal formuladas, respuestas repartidas en varios documentos, preguntas que piden una visión de conjunto o que necesitan varias búsquedas encadenadas. Todas cuestan algo (latencia, llamadas extra al modelo, complejidad), así que la regla es la misma que en todo el stack: **mide dónde falla tu sistema y aplica solo lo que ataca ese fallo**.
+
+## Mejorar la consulta
+
+- **Reescritura**: un LLM convierte «¿y para Canarias?» en una pregunta completa usando el historial del chat. Imprescindible en conversaciones.
+- **Múltiples consultas**: se generan varias formulaciones de la pregunta, se busca con cada una y se fusionan los resultados (RRF). Sube el recall a cambio de más búsquedas.
+- **Descomposición**: «¿qué plan necesito para usar la API y cuánto cuesta el almacenaje?» se parte en dos búsquedas.
+- **HyDE** (*Hypothetical Document Embeddings*): el LLM escribe una respuesta hipotética y se busca con su embedding, que se parece más a los documentos que la pregunta. Útil cuando preguntas y documentos se expresan muy distinto; arriesgado si la respuesta inventada lleva la búsqueda en otra dirección.
+
+## Mejorar lo que se indexa
+
+- **Contextual retrieval**: un LLM antepone a cada fragmento una o dos frases que lo sitúan en su documento. Ver <Concept id="chunking">chunking</Concept>.
+- **Small-to-big**: se buscan fragmentos pequeños y se devuelve la sección completa a la que pertenecen.
+- **Resúmenes jerárquicos** (RAPTOR): se agrupan fragmentos, se resumen, se agrupan los resúmenes… y se indexan todos los niveles, para responder tanto a detalles como a preguntas generales.
+
+## Grafos: GraphRAG
+
+Un LLM extrae entidades y relaciones de los documentos y construye un grafo de conocimiento; después agrupa el grafo en comunidades y resume cada una. Brilla en preguntas **globales** («¿cuáles son los temas principales de estos 10.000 tickets?») que ningún fragmento individual contesta. Es caro de construir y mantener: se justifica cuando esas preguntas son el caso de uso, no por defecto.
+
+## Agentic RAG
+
+En lugar de una búsqueda fija, el modelo tiene la búsqueda como <Concept id="tool-calling">herramienta</Concept> y decide cuándo buscar, qué buscar, si los resultados bastan y si necesita otra búsqueda. Resuelve preguntas de varios saltos («¿qué dijo el cliente que más facturó el trimestre pasado?») a cambio de más latencia, más coste y menos previsibilidad. Es un <Concept id="agent-loop">bucle agéntico</Concept> con una herramienta de recuperación.
+
+<Callout type="note" title="Autocorrección">
+Variantes como Self-RAG o CRAG añaden un paso en el que el modelo juzga si lo recuperado es relevante y suficiente, y si no, reformula o busca en otra fuente. La idea es útil aunque no uses esos métodos tal cual: un umbral de relevancia y una segunda búsqueda condicionada ya capturan buena parte del beneficio.
+</Callout>
+
+## Cuándo usar qué
+
+| Síntoma | Técnica |
+|---|---|
+| Preguntas de seguimiento en un chat | Reescritura de la consulta |
+| Paráfrasis que no se encuentran | Múltiples consultas, HyDE, mejor modelo de embeddings |
+| Fragmentos que no se entienden solos | Contextual retrieval, small-to-big |
+| Respuestas repartidas en varios documentos | Descomposición, agentic RAG |
+| Preguntas sobre todo el corpus | Resúmenes jerárquicos, GraphRAG |
+| El modelo usa contexto irrelevante | Re-ranking, umbral, autocorrección |
+
+<Callout type="tradeoff">
+Cada técnica añade llamadas al modelo antes de responder. Una reescritura suma unos cientos de milisegundos; un agente que busca tres veces puede sumar varios segundos. Compara la mejora en tus métricas con lo que añade al percentil 95 de latencia y al coste por pregunta.
+</Callout>

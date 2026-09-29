@@ -1,0 +1,46 @@
+En <Concept id="embeddings">embeddings</Concept> viste qué es un vector de significado. Aquí toca la decisión práctica: **qué modelo** convierte tus textos en vectores. Es la pieza que más condiciona la búsqueda densa de un <Concept id="rag">RAG</Concept>, y cambiarla después obliga a recalcular todo el índice.
+
+## Cómo funciona un modelo de embeddings
+
+La mayoría son *bi-encoders*: un Transformer tipo codificador lee el texto y devuelve un vector por token; esos vectores se agregan (media, o el del primer token) en un único vector de tamaño fijo, normalmente normalizado a longitud 1. Se entrenan con pares de textos relacionados (pregunta y respuesta, título y párrafo) para que queden cerca, y con ejemplos no relacionados para que queden lejos.
+
+Pregunta y documento se codifican **por separado**. Por eso se pueden precalcular los vectores de millones de documentos y comparar cada pregunta con un simple producto escalar. El precio es que el modelo nunca ve la pregunta y el documento juntos, algo que sí hace un <Concept id="reranking">reranker</Concept>.
+
+## Qué mirar al elegir
+
+| Criterio | Por qué importa |
+|---|---|
+| Idiomas | Un modelo solo en inglés funciona mal en español. Los multilingües ponen el mismo significado en el mismo sitio aunque cambie el idioma. |
+| Dominio | Código, derecho o medicina tienen vocabulario propio; hay modelos especializados y se pueden ajustar. |
+| Longitud máxima | 512 tokens en muchos modelos pequeños, 8k o más en otros. Lo que sobra se trunca sin avisar. |
+| Dimensiones | 384–4.096 números por vector: más dimensiones, más memoria y búsquedas más lentas. |
+| Asimetría | Muchos modelos esperan un prefijo o instrucción distinta para preguntas y documentos. Olvidarlo empeora mucho los resultados. |
+| Coste y despliegue | API de pago por token o modelo abierto en tu infraestructura (o en el navegador). |
+
+<Callout type="warning" title="Los prefijos no son decoración">
+Los modelos E5 esperan `query: ` delante de las preguntas y `passage: ` delante de los documentos; otros, como Qwen3-Embedding, esperan una instrucción que describe la tarea. Si indexas sin el prefijo correcto, la calidad cae sin que nada falle. Revisa siempre la model card.
+</Callout>
+
+## El panorama
+
+- **APIs**: OpenAI, Cohere, Google, <Tool id="voyage" /> o <Tool id="jina" /> ofrecen embeddings por token, sin infraestructura.
+- **Modelos abiertos**: familias como E5, BGE, Qwen3-Embedding, EmbeddingGemma, Nomic o Jina, que se ejecutan con <Tool id="sentence-transformers" />, en un servidor o incluso en el navegador con <Tool id="transformers-js" />, como hace el lab de esta app.
+
+Los rankings cambian cada pocos meses. El de referencia es **MTEB** (y su versión multilingüe, MMTEB), que evalúa decenas de tareas: recuperación, clasificación, agrupación… Úsalo para hacer una lista corta, fijándote en la tarea de *retrieval* y en tu idioma, y decide con tus propios datos.
+
+<Callout type="insight" title="El mejor del ranking no es necesariamente el mejor para ti">
+MTEB mide promedios sobre conjuntos públicos. Un modelo algo peor en el ranking pero multilingüe, más pequeño o más rápido puede ser mejor elección. Con 50 preguntas reales y su documento correcto puedes comparar recall@k en una tarde.
+</Callout>
+
+## Ahorrar memoria sin cambiar de modelo
+
+Un índice de 10 millones de fragmentos con vectores de 1.024 dimensiones en float32 ocupa unos 40 GB. Dos técnicas lo reducen:
+
+- **Matryoshka**: modelos entrenados para que los primeros *n* números del vector ya sean un buen embedding. Se puede truncar de 1.024 a 256 dimensiones perdiendo poco.
+- **Cuantización de embeddings**: guardar cada número en int8 (4 veces menos) o incluso en 1 bit (32 veces menos, *binary quantization*), y recalcular con precisión completa solo los mejores candidatos. Es la misma idea que la <Concept id="quantization">cuantización</Concept> de pesos: el lab de embeddings guarda sus vectores en int8 y la similitud apenas cambia.
+
+## Errores habituales
+
+- **Mezclar modelos**: los vectores de dos modelos distintos no son comparables. Cambiar de modelo obliga a recalcular todo el índice.
+- **No versionar**: guarda con cada vector qué modelo (y versión) lo generó.
+- **Umbrales fijos**: la escala de similitudes depende del modelo (en E5 casi todo supera 0,7). Un umbral que funciona con un modelo no sirve con otro.

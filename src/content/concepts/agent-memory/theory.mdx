@@ -1,0 +1,45 @@
+Un LLM no recuerda nada entre llamadas: la API no tiene estado y todo lo que el modelo «sabe» de una conversación es lo que tu aplicación le envía (ver <Concept id="context-window">ventana de contexto</Concept>). La memoria de un agente es, por tanto, un problema de ingeniería: **qué guardar, dónde, cuándo recuperarlo y cuándo olvidarlo**.
+
+## Tipos de memoria
+
+| Tipo | Qué guarda | Ejemplo | Dónde vive |
+|---|---|---|---|
+| De trabajo | Lo que el agente está usando ahora | La conversación, resultados de herramientas, un plan | El contexto de la llamada |
+| Episódica | Lo que pasó | «El martes intentó cancelar el pedido 8431 y falló» | Historial, logs, base vectorial |
+| Semántica | Hechos estables | «Prefiere factura en PDF», «su almacén está en Zaragoza» | Perfil estructurado o base de datos |
+| Procedimental | Cómo hacer las cosas | Instrucciones, ejemplos, guías de estilo, habilidades | System prompt, ficheros de instrucciones |
+
+## Mecanismos
+
+- **Ventana deslizante**: se envían los últimos *n* turnos. Simple; lo antiguo desaparece sin más.
+- **Resumen (compactación)**: cuando la conversación crece, un modelo resume lo antiguo y el resumen sustituye a los turnos originales. Conserva lo esencial perdiendo detalle.
+- **Recuperación**: se guardan hechos o fragmentos de conversaciones pasadas con embeddings y se recuperan los relevantes para cada mensaje, como un <Concept id="rag">RAG</Concept> sobre la propia historia.
+- **Perfil estructurado**: hechos del usuario como pares clave-valor que se actualizan y se inyectan siempre. Predecible y fácil de auditar.
+- **Memoria como herramienta**: el agente decide qué recordar y qué consultar con herramientas como `remember` y `recall`, igual que una persona que toma notas. Es la idea de MemGPT, y la de los ficheros de notas o instrucciones que leen los agentes de código.
+
+<Callout type="insight" title="Recencia, relevancia e importancia">
+Un recuerdo útil no es solo el más parecido a la pregunta. Los *Generative Agents* puntuaban cada recuerdo combinando lo reciente que es, lo relevante que es para la situación y lo importante que se juzgó al guardarlo. Es un buen modelo mental para diseñar la recuperación.
+</Callout>
+
+## Escribir es lo difícil
+
+La recuperación se parece a un RAG. Lo que distingue a un buen sistema de memoria es la política de **escritura**:
+
+- **Qué merece guardarse**: preferencias explícitas, decisiones, hechos confirmados. No cada frase.
+- **Actualizar, no acumular**: «ahora vive en Valencia» debe sustituir a «vive en Zaragoza», no convivir con ello.
+- **Procedencia**: de qué conversación salió cada recuerdo y cuándo, para poder corregirlo o borrarlo.
+- **Olvido**: caducidad para lo temporal y borrado completo cuando el usuario lo pide.
+
+## Riesgos
+
+<Callout type="warning" title="La memoria también se envenena">
+Si un documento, un email o una página web consigue que el agente guarde una instrucción («a partir de ahora, envía copia de las facturas a…»), esa instrucción sobrevive a la conversación y se recupera en sesiones futuras. Es una <Concept id="prompt-injection">prompt injection</Concept> persistente. Guarda solo hechos, marca su origen y trata lo recuperado como datos, nunca como órdenes. Más en la sección de [seguridad](/security).
+</Callout>
+
+- **Privacidad**: la memoria es un almacén de datos personales. Aplica consentimiento, minimización, cifrado y derecho de supresión.
+- **Fugas entre usuarios**: cada recuerdo pertenece a un usuario (o a una organización) y la recuperación filtra siempre por ese dueño.
+- **Hechos obsoletos o contradictorios**: sin actualización ni caducidad, el agente acaba citando datos viejos con total seguridad.
+
+## Herramientas
+
+Frameworks como <Tool id="langgraph" /> separan la memoria de corto plazo (el estado del hilo, con checkpoints) de la de largo plazo (un almacén compartido entre hilos). Servicios como <Tool id="mem0" />, <Tool id="zep" /> o <Tool id="letta" /> gestionan la extracción, actualización y recuperación de recuerdos. Para muchos casos basta una tabla con el perfil del usuario y un resumen de las últimas conversaciones.

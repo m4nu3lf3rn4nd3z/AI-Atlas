@@ -1,0 +1,46 @@
+La búsqueda rápida (BM25, embeddings) tiene que decidir en milisegundos entre millones de fragmentos, así que compara representaciones calculadas por separado. Un reranker hace lo contrario: lee la pregunta y cada candidato **juntos**, con toda su atención, y solo para unos pocos. Es el paso que más suele mejorar un RAG por unidad de esfuerzo.
+
+## Dos etapas
+
+1. **Recuperar** 20–100 candidatos con un método rápido y de alto recall: que el bueno esté entre ellos.
+2. **Reordenar** esos candidatos con un modelo lento y preciso, y quedarse con los 3–10 mejores para el prompt.
+
+## Bi-encoder frente a cross-encoder
+
+| | Bi-encoder (embeddings) | Cross-encoder (reranker) |
+|---|---|---|
+| Entrada | Pregunta y documento por separado | La pareja pregunta + documento |
+| Precalculable | Sí: los documentos se indexan una vez | No: hay que evaluar cada pareja en cada consulta |
+| Coste por consulta | Un vector y una búsqueda | Una pasada del modelo por candidato |
+| Precisión | Buena | Mayor: ve cómo cada palabra de la pregunta se relaciona con el documento |
+
+Por eso no se usa un cross-encoder para buscar en todo el índice: con un millón de documentos serían un millón de pasadas por consulta.
+
+## Tipos de reranker
+
+- **Cross-encoders clásicos**: un codificador tipo BERT que devuelve una puntuación de relevancia. Ejemplos abiertos: la familia bge-reranker (el lab usa bge-reranker-v2-m3, multilingüe) o mxbai. Por API: <Tool id="cohere-rerank" />, <Tool id="voyage" /> o <Tool id="jina" />.
+- **Interacción tardía (ColBERT)**: guarda un vector por token del documento y compara token a token. Queda entre ambos mundos: precalculable, más preciso que un bi-encoder, pero con índices mucho más grandes.
+- **LLMs como reranker**: un modelo de lenguaje decide si cada documento responde a la pregunta, o reordena una lista entera. Muy capaces y caros; hay modelos entrenados específicamente para esto, como Qwen3-Reranker.
+
+## Puntuaciones y umbrales
+
+Muchos rerankers devuelven una puntuación entre 0 y 1 que se puede usar como **umbral de relevancia**: si ningún candidato lo supera, mejor no pasar contexto y responder que no hay información. En el lab de RAG, la pregunta sin respuesta obtiene 0,0004 como mejor puntuación, y todas las que sí la tienen superan 0,02. Como con los embeddings, la escala depende del modelo: el umbral se calibra con tus preguntas.
+
+<Callout type="insight" title="Lo que muestra el lab">
+Con puntuaciones reales de bge-reranker-v2-m3, el reranker coloca el fragmento correcto el primero en la gran mayoría de las preguntas, incluidas paráfrasis que la búsqueda híbrida dejaba en tercera o cuarta posición. Y aun así se equivoca en alguna: ninguna etapa es infalible, por eso se evalúa el pipeline completo.
+</Callout>
+
+## Coste y latencia
+
+El reranker añade una pasada del modelo por candidato. Con 50 candidatos y un modelo de tamaño medio, son decenas de milisegundos en GPU y bastante más en CPU. Los mandos:
+
+- **Cuántos candidatos** entran: más recall potencial, más latencia.
+- **Tamaño del modelo**: los pequeños son mucho más rápidos y a menudo suficientes.
+- **Longitud de los fragmentos**: el coste crece con los tokens de cada pareja.
+
+<Steps>
+  <Step title="Mide sin reranker">Recall@k y MRR con tu recuperación actual.</Step>
+  <Step title="Añádelo con 20–50 candidatos">Y compara MRR: el reranker mejora sobre todo el orden.</Step>
+  <Step title="Ajusta candidatos y modelo">Hasta cumplir tu presupuesto de latencia en el percentil 95.</Step>
+  <Step title="Calibra un umbral">Para que las preguntas sin respuesta acaben en «no lo sé».</Step>
+</Steps>

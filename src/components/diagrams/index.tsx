@@ -1,5 +1,6 @@
 import { AttentionDiagram } from './Attention'
 import { EmbeddingSpaceDiagram } from './EmbeddingSpace'
+import { HnswDiagram } from './Hnsw'
 import { KvCacheDiagram } from './KvCache'
 import { LostInMiddleDiagram } from './LostInMiddle'
 import { MoeDiagram } from './Moe'
@@ -20,4 +21,5 @@ export const DIAGRAMS = {
   'embedding-space': EmbeddingSpaceDiagram,
   'quant-grid': QuantGridDiagram,
   'rag-pipeline': RagPipelineDiagram,
+  hnsw: HnswDiagram,
 }
