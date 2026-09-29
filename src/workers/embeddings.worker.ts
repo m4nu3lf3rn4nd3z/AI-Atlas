@@ -6,6 +6,14 @@ import { env, pipeline, type FeatureExtractionPipeline } from '@huggingface/tran
 export const EMBEDDING_MODEL = 'Xenova/multilingual-e5-small'
 
 env.allowLocalModels = false
+// WASM runtime from CDN — the local file (ort-wasm-simd-threaded.asyncify.wasm) is
+// 25.6 MiB, just over Cloudflare's 25 MiB asset limit, so it's stripped from dist
+// by the cf-wasm-budget Vite plugin. Version must match the onnxruntime-web peer dep.
+const onnxWasm = env.backends.onnx?.wasm
+if (onnxWasm) {
+  onnxWasm.wasmPaths =
+    'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.31.0-dev.20260914-8d85527a0/dist/'
+}
 
 export type EmbedRequest = { id: number; type: 'load' } | { id: number; type: 'embed'; texts: string[] }
 
