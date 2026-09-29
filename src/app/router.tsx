@@ -3,6 +3,15 @@ import { createBrowserRouter } from 'react-router'
 import { AppShell } from './AppShell'
 import { RouteError } from './RouteError'
 
+// Auth pages — public routes (no AppShell, no auth required)
+const LoginPage = lazy(() => import('@/features/auth/LoginPage'))
+const RegisterPage = lazy(() => import('@/features/auth/RegisterPage'))
+const ForgotPasswordPage = lazy(() => import('@/features/auth/ForgotPasswordPage'))
+const ResetPasswordPage = lazy(() => import('@/features/auth/ResetPasswordPage'))
+const AuthCallbackPage = lazy(() => import('@/features/auth/AuthCallbackPage'))
+const VerifyEmailPage = lazy(() => import('@/features/auth/VerifyEmailPage'))
+
+// Protected pages — served by AppShell
 const HomePage = lazy(() => import('@/features/home/HomePage'))
 const MapPage = lazy(() => import('@/features/map/MapPage'))
 const ConceptPage = lazy(() => import('@/features/concept/ConceptPage'))
@@ -19,11 +28,21 @@ const GlossaryPage = lazy(() => import('@/features/glossary/GlossaryPage'))
 const ProgressPage = lazy(() => import('@/features/progress/ProgressPage'))
 const NotFound = lazy(() => import('./NotFound'))
 
-/* The URL is the source of truth for what is selected:
-   /map?c=<concept>&tab=<tab>  ·  /c/<concept>/<tab>  ·  /labs/<lab>
-   BASE_URL = Vite 'base' option: '/ai-atlas/' on GitHub Pages, '/' in dev */
+/* The URL is the source of truth for what is selected.
+   BASE_URL = Vite 'base' option: '/AI-Atlas/' on Cloudflare Pages, '/' in dev.
+   Auth is enforced server-side by the Cloudflare Worker (worker/auth.ts).
+   These React routes are a second line of defense. */
 export const router = createBrowserRouter(
   [
+    // ── Public auth routes (outside AppShell) ──────────────────────────
+    { path: 'login', element: <LoginPage /> },
+    { path: 'register', element: <RegisterPage /> },
+    { path: 'verify-email', element: <VerifyEmailPage /> },
+    { path: 'forgot-password', element: <ForgotPasswordPage /> },
+    { path: 'reset-password', element: <ResetPasswordPage /> },
+    { path: 'auth/callback', element: <AuthCallbackPage /> },
+
+    // ── Protected routes (inside AppShell) ────────────────────────────
     {
       element: <AppShell />,
       errorElement: <RouteError />,
