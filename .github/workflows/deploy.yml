@@ -22,7 +22,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
 
       - name: Install dependencies
@@ -37,8 +37,6 @@ jobs:
       - name: Build
         run: npm run build
         env:
-          # Sets Vite base to /ai-atlas/ so all asset paths are correct under
-          # the GitHub Pages project URL: https://m4nu3lf3rn4nd3z.github.io/ai-atlas/
           VITE_BASE_URL: /AI-Atlas/
 
       - uses: actions/upload-pages-artifact@v3
@@ -53,5 +51,7 @@ jobs:
     needs: build
     steps:
       - uses: actions/configure-pages@v4
+        with:
+          enablement: true
       - id: deployment
         uses: actions/deploy-pages@v4
