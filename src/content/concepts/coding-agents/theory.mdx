@@ -1,0 +1,121 @@
+Los **agentes de código** son sistemas agénticos especializados en tareas de ingeniería de software: escribir, modificar, depurar, testear y desplegar código de forma autónoma. Van desde asistentes de autocompletado hasta agentes que pueden resolver issues de GitHub sin supervisión humana.
+
+## El espectro de autonomía
+
+```
+Autocompletado → Generación → Asistente → Agente con tools → Agente autónomo
+(GitHub Copilot) (cloze)    (chat+código) (usa terminal/git) (resuelve issues solo)
+```
+
+La mayoría de valor práctico en 2026 está en los niveles intermedios: agentes que usan herramientas (terminal, filesystem, tests) con supervisión humana.
+
+## Las herramientas de un agente de código
+
+Un agente de código efectivo necesita:
+
+- **Lectura de archivos**: entender el contexto del codebase
+- **Escritura de archivos**: hacer cambios
+- **Ejecución de código**: en un <Concept id="code-sandboxes">sandbox</Concept>
+- **Ejecución de tests**: verificar que los cambios no rompen nada
+- **Búsqueda en el codebase**: grep, búsqueda semántica, AST parsing
+- **Terminal**: instalar dependencias, ejecutar scripts de build
+- **Git**: hacer commits, ver diffs, navegar el historial
+
+```python
+import anthropic
+import subprocess
+import os
+
+client = anthropic.Anthropic()
+
+tools = [
+    {
+        "name": "read_file",
+        "description": "Lee el contenido de un archivo",
+        "input_schema": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]},
+    },
+    {
+        "name": "write_file",
+        "description": "Escribe contenido en un archivo",
+        "input_schema": {
+            "type": "object",
+            "properties": {"path": {"type": "string"}, "content": {"type": "string"}},
+            "required": ["path", "content"],
+        },
+    },
+    {
+        "name": "run_tests",
+        "description": "Ejecuta los tests y devuelve el resultado",
+        "input_schema": {"type": "object", "properties": {"test_path": {"type": "string"}}, "required": []},
+    },
+    {
+        "name": "run_command",
+        "description": "Ejecuta un comando en el terminal (solo en directorio permitido)",
+        "input_schema": {"type": "object", "properties": {"command": {"type": "string"}}, "required": ["command"]},
+    },
+]
+```
+
+## El ciclo de resolución de bugs
+
+```
+1. Leer el issue/bug report
+2. Explorar el codebase relevante (leer archivos, buscar símbolos)
+3. Formular hipótesis sobre la causa
+4. Implementar el fix
+5. Ejecutar tests
+6. Si tests fallan: depurar y repetir desde 4
+7. Hacer commit con mensaje descriptivo
+```
+
+Esto es exactamente lo que hace Claude Code (la herramienta que estás usando ahora) y los demás agentes de código modernos.
+
+## Los agentes de código más conocidos
+
+| Agente | Enfoque | Open/Closed |
+|---|---|---|
+| **Claude Code** | CLI para ingeniería de software general | Closed |
+| **GitHub Copilot** | Autocompletado e inline chat en IDE | Closed |
+| **Cursor** | IDE con agente integrado | Closed |
+| **Devin** (Cognition) | Agente de ingeniería de software autónomo | Closed |
+| **SWE-agent** | Research agent para SWE-bench | Open-source |
+| **OpenHands** | Agente de código con sandbox Docker | Open-source |
+
+## SWE-bench: el benchmark de referencia
+
+SWE-bench evalúa a los agentes en tareas reales de GitHub: issues sin resolver en repos reales de Python (Django, Flask, etc.). El agente debe:
+1. Leer el issue
+2. Navegar el codebase
+3. Implementar el fix
+4. Pasar los tests del repo
+
+Los mejores agentes resuelven el 50-60% de los casos en SWE-bench Verified (sep 2026). Es mucho más difícil que los benchmarks de código académicos.
+
+## Buenas prácticas para usar agentes de código
+
+### Dar contexto rico
+
+```python
+# Contexto pobre → resultado pobre
+"Arregla el bug en el login"
+
+# Contexto rico → resultado mejor
+"""
+Bug: el login falla cuando el email contiene caracteres especiales (+, .)
+Ficheros relevantes: src/auth/login.py, tests/test_auth.py
+Error: ValueError en línea 47 de login.py
+Comportamiento esperado: emails como user+tag@domain.com deben funcionar
+"""
+```
+
+### Verificar siempre antes de aceptar
+
+Los agentes de código pueden introducir cambios correctos pero con efectos secundarios no deseados: eliminar código relacionado, cambiar comportamiento en edge cases, o hacer asumir invariantes que no son ciertos.
+
+### Tests como contrato
+
+El agente debería escribir tests que capturen el comportamiento correcto antes de hacer cambios. Si los tests pasan después del cambio, hay más confianza (aunque no garantía) de que el fix es correcto.
+
+<Callout type="tradeoff" title="La paradoja de los coding agents">
+Los agentes de código son más útiles exactamente donde es más difícil verificar sus cambios: codebases grandes y complejas. Cuanto más autónomo el agente, más importante es tener una suite de tests robusta que pueda actuar como verificador automático.
+</Callout>

@@ -1,0 +1,108 @@
+Los grafos con estado son la arquitectura para agentes que necesitan **memoria entre pasos**, la capacidad de **retroceder**, y puntos de **control humano**. LangGraph es la implementación más extendida.
+
+El concepto clave: el agente no es solo un bucle while; es un grafo donde cada nodo transforma el estado y las aristas determinan el flujo.
+
+## El problema que resuelven
+
+Un <Concept id="agent-loop">bucle ReAct simple</Concept> funciona bien para tareas cortas. Pero cuando la tarea es larga y compleja aparecen problemas:
+
+- ¿Cómo reanudar un agente que falló a la mitad?
+- ¿Cómo dejar que un humano revise el trabajo antes de continuar?
+- ¿Cómo volver atrás si el agente tomó una decisión equivocada?
+- ¿Cómo mantener estado persistente entre sesiones?
+
+Los grafos con estado resuelven esto con tres primitivas:
+
+### 1. Estado tipado
+
+Todo el estado del agente vive en un objeto explícito:
+
+```python
+from typing import TypedDict, Annotated
+import operator
+
+class AgentState(TypedDict):
+    messages: Annotated[list, operator.add]  # operador de actualización
+    documents: list[str]
+    draft: str
+    iteration: int
+    approved: bool
+```
+
+`Annotated[list, operator.add]` significa "cuando actualices este campo, añade al final en lugar de reemplazar".
+
+### 2. Checkpoints
+
+El estado se puede guardar en disco en cada paso:
+
+```python
+from langgraph.checkpoint.sqlite import SqliteSaver
+
+memory = SqliteSaver.from_conn_string("agent.db")
+graph = workflow.compile(checkpointer=memory)
+
+# Reanudar desde donde se quedó
+result = graph.invoke({"messages": []}, config={"configurable": {"thread_id": "tarea-42"}})
+```
+
+Si el agente falla, se puede relanzar con el mismo `thread_id` y continúa desde el último checkpoint guardado.
+
+### 3. Human-in-the-loop (HITL)
+
+El grafo puede **interrumpirse** antes de un nodo para esperar aprobación:
+
+```python
+graph = workflow.compile(
+    checkpointer=memory,
+    interrupt_before=["execute_action"],  # pausa antes de ejecutar acciones irreversibles
+)
+
+# Primera invocación: llega hasta antes de execute_action y para
+result = graph.invoke(input, config)
+print("El agente quiere ejecutar:", result["pending_action"])
+
+# El humano revisa y aprueba
+graph.update_state(config, {"approved": True})
+
+# Reanudar desde el checkpoint
+result = graph.invoke(None, config)  # None = continuar desde donde estaba
+```
+
+## Time-travel y debugging
+
+LangGraph guarda el historial completo de estados. Puedes:
+
+- **Ver** cómo evolucionó el estado en cada paso
+- **Reproducir** una ejecución pasada desde cualquier checkpoint
+- **Editar** el estado en un checkpoint y relanzar desde ahí ("¿qué hubiera pasado si el agente hubiera tomado la decisión B en el paso 3?")
+
+```python
+# Ver historial de checkpoints
+for state, metadata in graph.get_state_history(config):
+    print(f"Paso {metadata.step}: {state['iteration']} iteraciones")
+
+# Revertir a un estado anterior
+target_config = {"configurable": {"thread_id": "tarea-42", "checkpoint_id": "abc123"}}
+result = graph.invoke(None, target_config)
+```
+
+## Cuándo usar grafos con estado
+
+| Situación | ¿Grafo con estado? |
+|---|---|
+| Tarea corta (&lt;10 pasos) sin persistencia | No — bucle ReAct simple es suficiente |
+| Tarea larga que puede interrumpirse | Sí |
+| Necesitas aprobación humana en pasos críticos | Sí |
+| Quieres debuggear con time-travel | Sí |
+| Múltiples sesiones de usuario que retoman el trabajo | Sí |
+| Prototipar rápidamente | No — añade overhead de setup |
+
+<Callout type="tradeoff" title="Complejidad vs control">
+Los grafos con estado añaden complejidad: hay que definir el schema de estado, configurar el checkpointer, y gestionar los threads. Pero en sistemas de producción donde los agentes ejecutan tareas largas y críticas, ese control es esencial para depurar, auditar y mantener.
+</Callout>
+
+## Alternativas a LangGraph
+
+- **Temporal**: workflow engine para tareas de larga duración con retry automático y HITL
+- **Prefect / Dagster**: orquestadores de datos con soporte para LLMs
+- **State machines propias**: con `transitions` o implementación custom en TypeScript

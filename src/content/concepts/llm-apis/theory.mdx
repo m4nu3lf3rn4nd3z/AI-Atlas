@@ -1,0 +1,85 @@
+Toda interacción con un LLM sigue el mismo patrón: tu código envía una lista de **mensajes** con roles asignados y el modelo devuelve un **completion**. Aunque cada proveedor tiene su SDK, el contrato es muy similar.
+
+## La estructura de una petición
+
+```json
+{
+  "model": "claude-opus-5-5",
+  "max_tokens": 1024,
+  "system": "Eres un asistente técnico. Responde en español.",
+  "messages": [
+    { "role": "user",      "content": "¿Qué es el KV cache?" },
+    { "role": "assistant", "content": "El KV cache almacena..." },
+    { "role": "user",      "content": "¿Cuánta memoria ocupa?" }
+  ]
+}
+```
+
+Tres partes esenciales:
+
+- **`system`**: instrucciones globales para toda la conversación. En la API de Anthropic es un campo propio; en OpenAI es un mensaje con `role: "system"` al principio del array.
+- **`messages`**: el historial de la conversación. Alternancia estricta `user → assistant → user…`. Para conversaciones largas la app trunca o resume los mensajes más antiguos.
+- **`max_tokens`**: el máximo de tokens que el modelo puede generar. El modelo puede parar antes si termina naturalmente.
+
+<Callout type="note" title="El modelo no tiene memoria">
+El modelo no recuerda nada entre llamadas. Si quieres continuidad, tu app tiene que incluir el historial completo en cada petición. Esa es la razón por la que el coste sube con cada turno: re-envías los mensajes anteriores.
+</Callout>
+
+## Roles y flujo de turno
+
+| Rol | Quién escribe | Cuándo |
+|---|---|---|
+| `system` | Tú (la app) | Una vez, al inicio |
+| `user` | El usuario final o la app (en flujos automatizados) | Cada turno |
+| `assistant` | El modelo | Cada respuesta |
+
+En flujos de **tool calling** (ver <Concept id="tool-calling">tool calling</Concept>) aparece un rol adicional: el modelo emite un bloque `tool_use`, tu app ejecuta la herramienta, y añades el resultado en un mensaje con contenido `tool_result`.
+
+## Streaming
+
+Por defecto, la respuesta llega de golpe cuando el modelo termina. Con `stream: true` el texto llega como **Server-Sent Events** (SSE), token a token, lo que reduce el tiempo de primera respuesta visible (TTFT) y permite interrumpir la generación.
+
+```
+event: content_block_delta
+data: {"delta": {"type": "text_delta", "text": "El KV"}}
+
+event: content_block_delta
+data: {"delta": {"type": "text_delta", "text": " cache"}}
+```
+
+Los SDKs modernos envuelven el stream en iteradores async que ya manejan el parsing por ti.
+
+## Parámetros de control
+
+| Parámetro | Qué hace | Cuándo toca |
+|---|---|---|
+| `max_tokens` | Límite de tokens generados | Siempre; evita respuestas interminables y controla el coste |
+| `temperature` | Aleatoriedad del muestreo (0 = determinista, 1+ = más variado) | Cuando quieres creatividad o necesitas reproducibilidad |
+| `top_p` / `top_k` | Restringe el espacio de sampling | Ajuste fino del comportamiento generativo |
+| `stop_sequences` | Para la generación al encontrar estas cadenas | Útil en parseo de salidas estructuradas |
+
+<Callout type="insight" title="Adaptive thinking en Claude 4+">
+Los modelos Claude 4.6 y superiores soportan <code>thinking: {"{type: \"adaptive\"}"}</code> en lugar de los parámetros de temperatura clásicos. El modelo decide internamente cuánto razonar antes de responder. Usa esto para tareas que se benefician de razonamiento profundo.
+</Callout>
+
+## La API de Anthropic vs OpenAI Chat Completions
+
+Las diferencias más importantes para quien migra:
+
+| Aspecto | Anthropic | OpenAI |
+|---|---|---|
+| System prompt | Campo `system` a nivel raíz | Mensaje con `role: "system"` en el array |
+| Streaming delta | `content_block_delta` | `choices[0].delta.content` |
+| Tool calls | `tool_use` blocks en el contenido | `tool_calls` array en el mensaje |
+| Thinking | `thinking` blocks en el contenido | Razonamiento oculto |
+
+Muchos runtimes locales (Ollama, LM Studio, vLLM) exponen un endpoint `/v1/chat/completions` compatible con la API de OpenAI, lo que permite apuntar a modelos locales con el mismo código.
+
+## Latencia y coste
+
+Cada petición incurre en dos costes medibles:
+
+- **Tokens de entrada** = system + historial + nuevo mensaje del usuario. Se pagan todos en cada turno.
+- **Tokens de salida** = lo que genera el modelo. Suelen costar 3–5× más por token que los de entrada.
+
+La <Concept id="latency-cost-metrics">métrica clave</Concept> es el **TTFT** (time to first token): el tiempo desde que envías la petición hasta que llega el primer token. Con streaming, el usuario ve texto antes aunque la generación completa tarde más.

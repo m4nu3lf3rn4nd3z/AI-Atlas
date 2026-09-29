@@ -1,0 +1,122 @@
+Los modelos **multimodales** procesan y generan múltiples tipos de datos además del texto: imágenes, audio, vídeo, código, documentos. La multimodalidad amplía dramáticamente lo que un sistema LLM puede percibir y hacer.
+
+## Tipos de modalidades
+
+### Visión (imagen → texto)
+
+Los modelos con visión pueden analizar imágenes y responder preguntas sobre ellas:
+
+```python
+import anthropic
+import base64
+
+client = anthropic.Anthropic()
+
+# Analizar una imagen
+with open("diagrama.png", "rb") as f:
+    image_data = base64.standard_b64encode(f.read()).decode("utf-8")
+
+response = client.messages.create(
+    model="claude-opus-5-5",
+    max_tokens=1024,
+    messages=[{
+        "role": "user",
+        "content": [
+            {
+                "type": "image",
+                "source": {"type": "base64", "media_type": "image/png", "data": image_data},
+            },
+            {"type": "text", "text": "Explica este diagrama de arquitectura de sistema."},
+        ],
+    }],
+)
+```
+
+Casos de uso: análisis de documentos escaneados, diagramas técnicos, capturas de pantalla, OCR con comprensión.
+
+### Visión (texto → imagen)
+
+Generación de imágenes a partir de texto. Modelos como DALL-E 3, Flux, Stable Diffusion, Midjourney.
+
+```python
+# OpenAI DALL-E 3
+from openai import OpenAI
+client = OpenAI()
+response = client.images.generate(
+    model="dall-e-3",
+    prompt="Diagrama técnico de un sistema RAG con vectores y retrieval",
+    n=1, size="1024x1024"
+)
+```
+
+### Audio
+
+- **Speech-to-text**: Whisper (OpenAI) convierte audio a texto con alta precisión
+- **Text-to-speech**: ElevenLabs, Azure TTS, Google TTS generan audio natural desde texto
+- **Audio nativo**: Gemini 1.5+ puede procesar audio directamente sin transcripción previa
+
+```python
+# Transcripción con Whisper
+from openai import OpenAI
+client = OpenAI()
+with open("audio.mp3", "rb") as f:
+    transcription = client.audio.transcriptions.create(model="whisper-1", file=f)
+print(transcription.text)
+```
+
+### Documentos (PDF, Word, etc.)
+
+Claude y GPT-4o pueden procesar PDFs directamente como parte del contexto:
+
+```python
+# Claude con PDF como documento
+with open("contrato.pdf", "rb") as f:
+    pdf_data = base64.standard_b64encode(f.read()).decode("utf-8")
+
+response = client.messages.create(
+    model="claude-opus-5-5",
+    max_tokens=2048,
+    messages=[{"role": "user", "content": [
+        {"type": "document", "source": {"type": "base64", "media_type": "application/pdf", "data": pdf_data}},
+        {"type": "text", "text": "Resume las cláusulas de rescisión de este contrato."},
+    ]}],
+)
+```
+
+## Modelos multimodales más usados
+
+| Modelo | Modalidades | Puntos fuertes |
+|---|---|---|
+| Claude Sonnet/Opus | Imagen, PDF, texto | Análisis de documentos complejos, code+imagen |
+| GPT-4o | Imagen, audio, texto | Audio nativo, ecosistema amplio |
+| Gemini 1.5/2 | Imagen, audio, vídeo, texto | Contexto muy largo, vídeo nativo |
+| Llama 3.2 Vision | Imagen, texto | Open-weights con visión |
+
+## Casos de uso más valiosos
+
+### Document understanding
+
+Extraer información estructurada de documentos complejos: facturas, contratos, formularios médicos, informes financieros. Los modelos multimodales evitan el pipeline OCR→texto→LLM y procesan el documento directamente.
+
+### Code + screenshots
+
+Un desarrollador puede mostrar una captura de pantalla con un error y preguntar cómo solucionarlo. El modelo ve el código y el error visual a la vez.
+
+### Data extraction from charts
+
+Extraer datos de gráficos e imágenes donde el texto nativo no está disponible.
+
+### Accessibility
+
+Generar descripciones automáticas de imágenes para personas con discapacidad visual.
+
+## Limitaciones actuales
+
+- **Conteo preciso**: los modelos cometen errores al contar objetos en imágenes
+- **Texto en imágenes muy pequeño**: OCR en texto diminuto sigue siendo impreciso
+- **Razonamiento espacial complejo**: relaciones espaciales 3D son difíciles
+- **Vídeo**: solo unos pocos modelos procesan vídeo nativo (Gemini); la mayoría requiere extraer frames
+
+<Callout type="note" title="Multimodalidad y privacidad">
+Las imágenes enviadas a APIs de modelos contienen información visual que puede ser sensible (rostros, documentos con datos personales, pantallas con información confidencial). Revisa las políticas de retención de datos del proveedor antes de enviar imágenes de producción.
+</Callout>

@@ -1,0 +1,93 @@
+Los LLMs generan texto libre: un modelo puede responder "El precio es 42€" o "42" o "€42.00" para la misma pregunta. Para que tu código pueda parsear la respuesta de forma fiable, necesitas que el modelo emita una estructura garantizada. Eso son los **structured outputs**.
+
+## El problema que resuelven
+
+Sin garantía estructural, parsear JSON de un LLM requiere:
+- Pedir JSON en el prompt (no siempre lo cumple)
+- Corregir JSON malformado (llaves sin cerrar, comas extra)
+- Reintentar si la estructura no coincide con el esquema esperado
+
+Con structured outputs, el motor de inferencia **modifica el proceso de sampling** para que solo se puedan generar tokens válidos según el esquema: es imposible producir un JSON malformado.
+
+## Cómo funciona: decodificación con restricciones
+
+Antes de cada token, el modelo calcula logits para todo el vocabulario. La decodificación restringida aplica una **máscara** que pone a −∞ todos los tokens que producirían una secuencia inválida según la gramática:
+
+```
+Esquema: {"name": string, "age": integer}
+Tokens ya generados: {"name": "
+
+→ Solo tokens válidos: cualquier carácter de texto (el string no ha terminado)
+→ Tokens inválidos: }, [, 0-9 (empezar age sin terminar name)
+```
+
+Esto se implementa con gramáticas libres de contexto o mediante guías de tokens derivadas del JSON Schema. Llama.cpp, vLLM, Outlines y la mayoría de APIs modernas lo soportan.
+
+<Callout type="insight" title="Grammar-based vs schema validation">
+Hay dos enfoques: (1) restringir el sampling en tiempo de inferencia (grammar-based), que garantiza salida válida al 100 % pero puede ser más lento en vocabularios grandes; (2) pedir JSON en el prompt y validar después, que es más flexible pero puede fallar. Las APIs modernas usan el primer enfoque.
+</Callout>
+
+## API de Anthropic: `tool_use` para JSON estructurado
+
+Anthropic no expone el JSON mode directamente, pero el mecanismo de **tool use** garantiza salidas estructuradas: defines el esquema como una herramienta con un único parámetro, y el modelo emite siempre el JSON correcto:
+
+```python
+tool = {
+    "name": "extraer_datos",
+    "description": "Extrae los datos del texto",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "nombre": {"type": "string"},
+            "edad": {"type": "integer"},
+            "email": {"type": "string", "format": "email"},
+        },
+        "required": ["nombre", "edad"],
+    },
+}
+```
+
+El modelo responderá siempre con un bloque `tool_use` con el JSON validado contra ese esquema.
+
+## API de OpenAI: `response_format`
+
+Con `response_format: { "type": "json_schema", "json_schema": {...} }` y `strict: true`, el modelo usa decodificación restringida para garantizar el esquema:
+
+```python
+response_format = {
+    "type": "json_schema",
+    "json_schema": {
+        "name": "extraccion",
+        "strict": True,
+        "schema": {
+            "type": "object",
+            "properties": {
+                "nombre": {"type": "string"},
+                "edad": {"type": "integer"},
+            },
+            "required": ["nombre", "edad"],
+            "additionalProperties": False,
+        },
+    },
+}
+```
+
+## Casos de uso habituales
+
+| Caso | Por qué structured outputs |
+|---|---|
+| Extracción de entidades (NER) | Garantiza que siempre llegan los campos requeridos |
+| Clasificación con etiqueta fija | El modelo solo puede emitir las etiquetas del enum |
+| Tool calling / function calling | El argumento JSON de la herramienta siempre es válido |
+| Pipelines de datos | El paso siguiente confía en la estructura sin validación |
+| Agentes con estado tipado | El estado del agente siempre es parseable |
+
+## Limitaciones
+
+- **Velocidad**: la decodificación restringida puede ser un 5–15 % más lenta porque recalcula la máscara en cada token.
+- **Esquemas complejos**: referencias `$ref`, `oneOf` anidados o patrones regex complejos pueden no ser soportados por todos los motores.
+- **No garantiza semántica**: el JSON es válido estructuralmente, pero el modelo puede inventar valores incorrectos. Valida el contenido por separado (p. ej. que la edad sea positiva).
+
+<Callout type="tradeoff" title="JSON en el prompt vs structured outputs">
+Pedir JSON en el prompt es más rápido de implementar pero produce fallos intermitentes, especialmente en modelos pequeños o cuando el JSON tiene muchos niveles de anidamiento. Para cualquier código que procese la salida programáticamente, usa structured outputs.
+</Callout>

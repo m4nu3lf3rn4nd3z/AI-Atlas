@@ -1,0 +1,93 @@
+Cuando un LLM no se comporta como necesitas, tienes tres herramientas principales: mejorar el prompt, añadir RAG, o hacer fine-tuning. Elegir la incorrecta es uno de los errores más caros en proyectos de IA.
+
+El árbol de decisión es sencillo, pero requiere entender bien qué problema tiene realmente tu sistema.
+
+## Diagrama de decisión
+
+```
+¿El modelo base hace bien la tarea con un buen prompt?
+  ↓ SÍ
+¿Necesitas conocimiento externo actualizable?
+  ├── SÍ → RAG
+  └── NO → Prompt engineering es suficiente
+
+  ↓ NO
+¿Por qué falla?
+  ├── Falta información (documentos, base de conocimiento) → RAG
+  ├── Comportamiento incorrecto (tono, formato, dominio) → Fine-tuning
+  ├── Ambos → RAG + Fine-tuning
+  └── Capacidad cognitiva insuficiente → Modelo más grande
+```
+
+## Empezar siempre por el prompt
+
+Un error muy común es hacer fine-tuning cuando una iteración del prompt habría resuelto el problema. El prompt tiene:
+
+- **Tiempo de iteración: horas**
+- **Coste: casi cero**
+- **Mantenimiento: fácil de actualizar**
+
+Un buen prompt de sistema que incluye: rol, contexto, ejemplos few-shot, formato de output y restricciones, resuelve ~80% de los casos en los que se pensaba que hacía falta fine-tuning.
+
+Antes de pasar a la siguiente herramienta, asegúrate de haber probado:
+- Zero-shot con instrucciones claras
+- Few-shot (3–5 ejemplos representativos)
+- Chain-of-thought ("piensa paso a paso")
+- Formato de output explícito
+
+## Cuándo añadir RAG
+
+<Concept id="rag">RAG</Concept> es la solución cuando el problema es de **conocimiento**, no de comportamiento:
+
+✅ RAG funciona para:
+- Información que cambia frecuentemente (precios, noticias, políticas, documentos internos)
+- Bases de conocimiento grandes que no caben en el contexto
+- Necesitar citar fuentes específicas con precisión
+- Dominios donde el modelo base aluicina por falta de conocimiento específico
+
+❌ RAG no funciona para:
+- Enseñar al modelo a seguir un formato de output específico
+- Cambiar el tono o el estilo de respuesta
+- Mejorar el razonamiento del modelo
+- Capacidades que el modelo base simplemente no tiene
+
+**El flujo RAG no elimina las alucinaciones**: un modelo puede alucinar *dentro* del contexto proporcionado. Combina RAG con un paso de verificación de faithfulness (¿la respuesta está basada en los documentos?) si la precisión es crítica.
+
+## Cuándo hacer fine-tuning
+
+<Concept id="fine-tuning">Fine-tuning</Concept> es la solución cuando el problema es de **comportamiento**, no de conocimiento:
+
+✅ Fine-tuning funciona para:
+- Formato de output muy específico y consistente que el prompting no garantiza
+- Dominio especializado con terminología que el modelo base no conoce
+- Reducir el coste usando un modelo 7B fine-tuneado en lugar de un 70B general
+- Comportamiento conversacional específico (tono, estilo, restricciones de dominio)
+
+❌ Fine-tuning no funciona para:
+- Añadir conocimiento actualizable (usa RAG)
+- Mejorar el razonamiento base del modelo
+- Casos donde el modelo comete errores por falta de información (usa RAG)
+- Cuando no tienes suficientes ejemplos de calidad
+
+## La combinación RAG + Fine-tuning
+
+En muchos sistemas de producción se usan ambos:
+
+1. **Fine-tuning**: enseña al modelo el formato, el tono, la terminología del dominio
+2. **RAG**: proporciona la información específica de cada consulta en tiempo real
+
+Ejemplo: un asistente médico. Fine-tuning para usar terminología médica correcta y seguir protocolos de respuesta; RAG para acceder a guías clínicas actualizadas y al historial del paciente.
+
+## La dimensión coste/tiempo
+
+| | Prompt | RAG | Fine-tuning |
+|---|---|---|---|
+| Tiempo hasta primer resultado | Horas | Días | Semanas |
+| Coste de implementación | Bajo | Medio | Alto |
+| Coste de mantenimiento | Bajo | Medio (reindexar) | Alto (reentrenar) |
+| Velocidad de iteración | Rápida | Media | Lenta |
+| Requiere datos etiquetados | No | No | Sí |
+
+<Callout type="tradeoff" title="La secuencia correcta">
+El orden óptimo es: 1. Prueba exhaustiva con prompting → 2. Añade RAG si el problema es de conocimiento → 3. Fine-tuning solo si nada de lo anterior es suficiente. Saltarse pasos es costoso: hacer fine-tuning cuando el problema era un prompt malo desperdicia semanas.
+</Callout>

@@ -1,13 +1,11 @@
 import { AnimatePresence } from 'motion/react'
-import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type MouseEvent } from 'react'
 import { useLocation, useSearchParams } from 'react-router'
 import { getConcept } from '@/content'
-import { EDGES } from '@/content/graph'
 import { LAYERS } from '@/content/layers'
 import type { LayerId } from '@/content/schema'
 import { useUi } from '@/stores/ui'
 import { isConceptTab, type ConceptTab } from '../concept/tabs'
-import { Connections } from './Connections'
 import { computeHighlight, useHighlight } from './highlight'
 import { InspectorDrawer } from './InspectorDrawer'
 import { LayerBand } from './LayerBand'
@@ -22,10 +20,7 @@ export default function MapPage() {
   const tabParam = params.get('tab')
   const tab: ConceptTab = isConceptTab(tabParam) ? tabParam : 'learn'
 
-  const hovered = useUi((s) => s.hovered)
-  const setHovered = useUi((s) => s.setHovered)
   const prereqMode = useUi((s) => s.prereqMode)
-  const hiddenEdgeTypes = useUi((s) => s.hiddenEdgeTypes)
 
   const scrollRef = useRef<HTMLDivElement>(null)
   const contentRef = useRef<HTMLDivElement>(null)
@@ -54,19 +49,16 @@ export default function MapPage() {
     [update],
   )
   const close = useCallback(() => {
-    // Touch screens never fire mouseleave, so a tapped card would stay "hovered".
-    setHovered(null)
     update((p) => {
       p.delete('c')
       p.delete('tab')
     })
-  }, [update, setHovered])
+  }, [update])
 
-  // Highlight: the hovered concept wins; otherwise the one open in the inspector.
-  const visibleEdges = useMemo(() => EDGES.filter((e) => !hiddenEdgeTypes.includes(e.type)), [hiddenEdgeTypes])
+  // Highlight: dims layers whose concepts aren't related to the selected one.
   useEffect(() => {
-    useHighlight.setState({ ...computeHighlight(hovered ?? selected, prereqMode, visibleEdges), selected })
-  }, [hovered, selected, prereqMode, visibleEdges])
+    useHighlight.setState({ ...computeHighlight(selected, prereqMode, []), selected })
+  }, [selected, prereqMode])
   useEffect(() => () => useHighlight.setState({ active: null, selected: null, nodes: null, edges: null }), [])
 
   // Scrollspy for the layer navigation.
@@ -132,7 +124,6 @@ export default function MapPage() {
             ratón o toca un concepto para ver con qué se conecta; ábrelo para estudiarlo.
           </p>
           <div ref={contentRef} className="relative mx-auto max-w-[1400px] space-y-3">
-            <Connections contentRef={contentRef} />
             {LAYERS.map((layer) => (
               <LayerBand key={layer.id} layer={layer} onOpen={open} />
             ))}

@@ -1,0 +1,94 @@
+Un LLM solo puede generar texto. **Tool calling** es el mecanismo por el que el modelo *pide* ejecutar una función externa: emite una llamada estructurada, tu código la ejecuta, y el resultado vuelve al modelo para que continúe respondiendo.
+
+El modelo no ejecuta nada. Tu código sí.
+
+## El bucle de tool calling
+
+```
+Usuario: "¿Cuánto es 1 USD en EUR ahora mismo?"
+
+1. App → Modelo: mensaje + definición de herramienta get_exchange_rate
+2. Modelo → App: {"tool_use": {"name": "get_exchange_rate", "input": {"from": "USD", "to": "EUR"}}}
+3. App ejecuta get_exchange_rate("USD", "EUR") → 0.91
+4. App → Modelo: {"tool_result": {"content": "0.91", "tool_use_id": "..."}}
+5. Modelo → App: "1 USD equivale a 0.91 EUR según el tipo de cambio actual."
+```
+
+Pasos 2–4 pueden repetirse múltiples veces si la tarea requiere varias herramientas o si el modelo refina su consulta.
+
+## Definir una herramienta
+
+La definición incluye nombre, descripción y el JSON Schema de los parámetros. La descripción es crítica: el modelo decide *si* y *cuándo* usar la herramienta basándose en ella.
+
+```json
+{
+  "name": "buscar_producto",
+  "description": "Busca un producto en el catálogo por nombre o categoría. Úsala cuando el usuario pregunte por disponibilidad, precio o características de un producto.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "description": "Término de búsqueda: nombre del producto o categoría"
+      },
+      "max_resultados": {
+        "type": "integer",
+        "description": "Número máximo de resultados a devolver (1-10)",
+        "default": 5
+      }
+    },
+    "required": ["query"]
+  }
+}
+```
+
+<Callout type="insight" title="La descripción es el contrato">
+El modelo no ve el código de tu función: solo ve el nombre y la descripción. Una descripción vaga lleva a llamadas incorrectas o innecesarias. Una descripción precisa (qué hace, cuándo usarla, qué no hace) es la diferencia entre un agente fiable y uno errático.
+</Callout>
+
+## Tipos de tool_choice
+
+| Modo | Comportamiento |
+|---|---|
+| `auto` (por defecto) | El modelo decide si usar o no una herramienta |
+| `any` | El modelo debe usar alguna herramienta |
+| `{"type": "tool", "name": "X"}` | El modelo debe usar exactamente esa herramienta |
+| `none` | El modelo no puede usar herramientas en este turno |
+
+## Llamadas paralelas y secuenciales
+
+Los modelos modernos pueden emitir **varias llamadas de herramienta en el mismo turno** cuando las tareas son independientes:
+
+```
+Modelo emite en un solo turno:
+- get_weather(city="Madrid")
+- get_weather(city="Barcelona")
+```
+
+Tu código ejecuta ambas en paralelo, devuelve ambos resultados, y el modelo los combina en una sola respuesta. Esto reduce el número de turnos y la latencia total.
+
+## Validación y seguridad
+
+Antes de ejecutar cualquier herramienta, tu código debe:
+
+1. **Validar el input** contra el esquema (el modelo puede emitir tipos incorrectos)
+2. **Verificar permisos**: ¿el usuario actual puede llamar a esta función con estos parámetros?
+3. **Limitar el daño posible**: una herramienta que borra datos necesita confirmación
+
+```python
+def safe_execute(tool_name: str, tool_input: dict) -> str:
+    if tool_name not in ALLOWED_TOOLS:
+        return "Error: herramienta no autorizada"
+    validate_schema(tool_input, TOOLS[tool_name]["input_schema"])  # lanza si inválido
+    if TOOLS[tool_name].get("destructive"):
+        require_confirmation(tool_name, tool_input)
+    return TOOLS[tool_name]["fn"](**tool_input)
+```
+
+<Callout type="tradeoff" title="Número de herramientas">
+Más herramientas = más capacidades, pero también más posibilidades de que el modelo elija la incorrecta o que el contexto se llene de descripciones. Para agentes de propósito general, 5–10 herramientas bien definidas funcionan mejor que 50 vagamente definidas.
+</Callout>
+
+## Tool calling vs MCP
+
+Tool calling es el mecanismo de la API: defines las herramientas en el código cliente. <Concept id="mcp">MCP (Model Context Protocol)</Concept> añade una capa de protocolo para que las herramientas vivan en servidores separados, con descubrimiento dinámico y transporte estándar. Tool calling es la pieza fundamental; MCP es la infraestructura que la escala.

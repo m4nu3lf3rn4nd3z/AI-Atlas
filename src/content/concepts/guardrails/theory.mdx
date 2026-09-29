@@ -1,0 +1,98 @@
+Los **guardrails** son controles de seguridad y calidad que actúan sobre las entradas y salidas de un sistema LLM. No resuelven los problemas de los LLMs; **reducen su impacto** cuando el modelo produce algo no deseado.
+
+La metáfora correcta no es "muros que impiden el mal": es **capas de defensa** donde cada una falla gracefully cuando la anterior no es suficiente.
+
+## Tipos de guardrails
+
+### Guardrails de input
+
+Se ejecutan **antes** de enviar el mensaje al LLM principal:
+
+- **Validación de formato**: ¿el input cumple el esquema esperado? ¿longitud razonable?
+- **Filtrado de contenido**: detectar contenido dañino, off-topic, o fuera de scope
+- **Detección de prompt injection**: identificar patrones de inyección conocidos
+- **PII detection**: detectar datos personales antes de enviarlos al modelo
+
+```python
+def input_guardrail(user_input: str) -> str | None:
+    # None = guardrail rechaza el input
+    if len(user_input) > 10_000:
+        return None  # Demasiado largo, posible ataque DoS
+    if contains_pii(user_input):
+        user_input = redact_pii(user_input)  # Redactar antes de enviar
+    if is_off_topic(user_input):
+        return None  # Fuera del scope del sistema
+    return user_input
+```
+
+### Guardrails de output
+
+Se ejecutan **después** de recibir la respuesta del LLM:
+
+- **Validación de formato**: ¿el output sigue el schema esperado (JSON, etc.)?
+- **Filtrado de contenido**: detectar respuestas dañinas o inapropiadas
+- **Verificación de factualidad**: ¿la respuesta cita fuentes inventadas?
+- **Detección de exfiltración**: ¿la respuesta intenta revelar el system prompt o datos internos?
+
+### Guardrails de acción (para agentes)
+
+En sistemas agénticos, también se necesita validar **antes de ejecutar acciones irreversibles**:
+
+```python
+async def action_guardrail(tool_call: ToolCall) -> bool:
+    # Interceptar acciones de alto impacto
+    if tool_call.name == "delete_file":
+        # Pedir confirmación humana para borrados
+        return await request_human_approval(tool_call)
+    if tool_call.name == "send_email" and tool_call.params["to"] not in ALLOWED_RECIPIENTS:
+        return False  # Rechazar envíos a destinatarios no autorizados
+    return True
+```
+
+## Las dos estrategias
+
+### Modelo secundario de clasificación
+
+Un LLM más pequeño (o un clasificador fine-tuneado) evalúa el input/output antes o después del LLM principal:
+
+```python
+def content_safety_check(text: str) -> bool:
+    response = client.messages.create(
+        model="claude-haiku-4-5-20251001",  # modelo rápido y barato para guardrails
+        max_tokens=10,
+        system="Responde solo 'safe' o 'unsafe'. ¿Este texto contiene contenido dañino?",
+        messages=[{"role": "user", "content": text}],
+    )
+    return response.content[0].text.strip().lower() == "safe"
+```
+
+### Librerías especializadas
+
+- **Guardrails AI**: DSL para definir guardrails declarativos con validadores Python
+- **NeMo Guardrails (NVIDIA)**: sistema de rails basado en Colang para flujos de conversación
+- **LlamaGuard**: modelo de Meta fine-tuneado específicamente para clasificación de seguridad
+
+<Callout type="tradeoff" title="Latencia vs seguridad">
+Cada guardrail añade latencia. Un guardrail de input que llama a otro LLM puede añadir 200–500ms. Diseña guardrails con el modelo mínimo necesario y considera ejecutarlos en paralelo con la llamada principal para enmascarar la latencia.
+</Callout>
+
+## Lo que los guardrails NO garantizan
+
+| Problema | ¿Guardrail lo resuelve? |
+|---|---|
+| Alucinaciones | No — un guardrail de factualidad detecta algunas, pero no tiene "verdad" a la que comparar |
+| Prompt injection sofisticada | No completamente — los ataques evolucionan más rápido que los clasificadores |
+| Jailbreaking de modelos base | No — solo mitiga, no elimina |
+| Errores de razonamiento | No — guardrails son heurísticos, no verificadores formales |
+
+<Callout type="note" title="La defensa más efectiva">
+La combinación más efectiva de guardrails en agentes es: **mínimo privilegio** (el agente solo puede hacer lo que necesita) + **confirmación humana** para acciones irreversibles + **sandboxing** del código ejecutado. Los guardrails de clasificación son una capa adicional, no la principal.
+</Callout>
+
+## Diseño práctico
+
+1. **Empezar simple**: un prompt de sistema claro y bien escrito es el primer guardrail
+2. **Medir antes de añadir**: antes de añadir una capa de guardrail, medir el problema que resolverá
+3. **Monitorizar falsos positivos**: guardrails demasiado agresivos degradan la experiencia del usuario
+4. **Fallar gracefully**: cuando un guardrail rechaza, dar una respuesta útil ("No puedo ayudar con eso, pero sí puedo...")
+5. **Mantener los guardrails actualizados**: los atacantes adaptan sus técnicas

@@ -1,0 +1,132 @@
+**Hugging Face** es la plataforma central del ecosistema de IA open-source: un hub para modelos, datasets y demos, y la organización detrás de las librerías `transformers`, `diffusers`, `peft` y `datasets`.
+
+Entender cómo navegar Hugging Face es una skill práctica fundamental para cualquier desarrollador de IA.
+
+## El Hub
+
+### Modelos
+
+El Hub tiene más de 800.000 modelos (septiembre 2026). Para encontrar lo que necesitas:
+
+**Por tarea**: `Text Generation`, `Text Classification`, `Question Answering`, `Image Classification`, `Text-to-Image`, `Speech Recognition`, etc.
+
+**Por base model**: busca `Llama-3.1` para ver todos los fine-tunes de ese modelo base.
+
+**Por popularidad**: los `likes` y las `downloads` son señales de comunidad, no garantía de calidad.
+
+**Nomenclatura de ficheros**: un repositorio típico contiene:
+```
+config.json          ← arquitectura (capas, hidden_size, etc.)
+tokenizer.json       ← vocabulario y reglas de tokenización
+tokenizer_config.json
+special_tokens_map.json
+model.safetensors    ← pesos (o particionados: model-00001-of-00003.safetensors)
+README.md            ← model card: descripción, limitaciones, licencia
+```
+
+### Model Cards
+
+La tarjeta del modelo es el documento más importante. Contiene:
+- **Intended uses**: para qué fue creado y para qué no
+- **Limitations**: sesgos conocidos, fallos documentados
+- **Training data**: qué datos se usaron
+- **Evaluation**: métricas en benchmarks
+- **License**: qué puedes hacer con el modelo
+
+Leer el model card antes de usar un modelo en producción es obligatorio, no opcional.
+
+### Licencias
+
+Las licencias más comunes en Hugging Face:
+
+| Licencia | Uso comercial | Fine-tuning | Distribución |
+|---|---|---|---|
+| Apache 2.0 | ✅ Sí | ✅ Sí | ✅ Sí |
+| MIT | ✅ Sí | ✅ Sí | ✅ Sí |
+| Llama 3.1 Community | ✅ Sí* | ✅ Sí | ✅ Sí* |
+| CC-BY-SA-4.0 | ✅ Sí | ✅ Sí | Solo con misma licencia |
+| Non-Commercial (NC) | ❌ No | Solo investigación | Restringida |
+
+*Llama 3.1 tiene restricción para servicios con >700M usuarios activos mensuales.
+
+### Datasets
+
+El Hub también aloja datasets para entrenamiento y evaluación. Para buscar uno relevante para fine-tuning:
+
+```python
+from datasets import load_dataset
+
+# Cargar un dataset del Hub
+dataset = load_dataset("HuggingFaceH4/ultrachat_200k")
+print(dataset)
+```
+
+## Las librerías principales
+
+### transformers
+
+La librería central para usar modelos de lenguaje en Python:
+
+```python
+from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
+import torch
+
+# Pipeline de alto nivel (más fácil)
+generator = pipeline("text-generation", model="Qwen/Qwen2.5-7B-Instruct", device_map="auto")
+result = generator("El KV cache almacena", max_new_tokens=50)
+
+# API de bajo nivel (más control)
+tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen2.5-7B-Instruct")
+model = AutoModelForCausalLM.from_pretrained("Qwen/Qwen2.5-7B-Instruct", torch_dtype=torch.bfloat16)
+```
+
+### PEFT (Parameter-Efficient Fine-Tuning)
+
+Para fine-tuning con LoRA y otras técnicas eficientes. Ver <Concept id="fine-tuning">fine-tuning</Concept>.
+
+### datasets
+
+```python
+from datasets import Dataset, load_dataset
+
+# Cargar, transformar, guardar
+ds = load_dataset("json", data_files="mi_dataset.jsonl", split="train")
+ds_filtered = ds.filter(lambda x: len(x["text"]) > 100)
+ds_filtered.push_to_hub("mi-usuario/mi-dataset")  # Subir al Hub
+```
+
+### Inference API y Inference Endpoints
+
+Hugging Face ofrece dos opciones para inferencia sin gestionar servidores:
+
+- **Inference API** (serverless): para prototipado rápido, con rate limits
+- **Inference Endpoints**: despliegue dedicado de cualquier modelo del Hub
+
+```python
+from huggingface_hub import InferenceClient
+
+client = InferenceClient("meta-llama/Llama-3.1-8B-Instruct")
+result = client.chat_completion(
+    messages=[{"role": "user", "content": "¿Qué es un transformer?"}],
+    max_tokens=500,
+)
+```
+
+## Descargar modelos localmente
+
+```bash
+# Instalar la CLI
+pip install huggingface_hub
+
+# Descargar un modelo completo
+huggingface-cli download Qwen/Qwen2.5-7B-Instruct --local-dir ./modelos/qwen
+
+# Descargar solo un fichero (ej: versión GGUF)
+huggingface-cli download bartowski/Qwen2.5-7B-Instruct-GGUF --include "Q4_K_M.gguf" --local-dir ./modelos/
+```
+
+Los modelos se cachean en `~/.cache/huggingface/hub` por defecto.
+
+<Callout type="note" title="Gate models">
+Algunos modelos requieren aceptar sus condiciones en huggingface.co antes de descargar. Llama 3.x, Gemma, Mistral requieren una cuenta de HF y aceptar la licencia. Necesitas un HF token con los permisos correctos.
+</Callout>

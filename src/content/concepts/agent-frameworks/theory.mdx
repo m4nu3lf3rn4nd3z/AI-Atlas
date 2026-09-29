@@ -1,0 +1,105 @@
+Los **frameworks de agentes** son librerías que abstraen el bucle agéntico, el manejo de herramientas, el estado y la orquestación de flujos complejos. Simplifican el desarrollo pero también añaden capas de abstracción que pueden ocultar lo que realmente ocurre.
+
+La pregunta clave es cuándo usar un framework y cuándo no.
+
+<Callout type="tradeoff" title="El consejo de Anthropic">
+Antes de adoptar un framework, considera implementar el patrón tú mismo. Un bucle agéntico simple (mensajes → tools → resultados → mensajes) es ~50 líneas de Python. Los frameworks añaden valor cuando necesitas sus características específicas, no por defecto.
+</Callout>
+
+## Los frameworks principales
+
+### LangChain + LangGraph
+
+El framework más extendido del ecosistema Python LLM:
+
+- **LangChain**: chains, LCEL (LangChain Expression Language), integraciones con docenas de LLMs, embeddings y vector stores
+- **LangGraph**: extensión para grafos con estado. Ver <Concept id="stateful-graphs">grafos con estado</Concept>
+- **LangSmith**: plataforma de observabilidad y evals integrada
+
+```python
+from langchain_anthropic import ChatAnthropic
+from langchain_core.tools import tool
+from langgraph.prebuilt import create_react_agent
+
+@tool
+def search_web(query: str) -> str:
+    """Busca información en la web."""
+    return f"Resultados para: {query}"  # implementación real con Tavily, Brave, etc.
+
+model = ChatAnthropic(model="claude-opus-5-5")
+agent = create_react_agent(model, tools=[search_web])
+result = agent.invoke({"messages": [{"role": "user", "content": "¿Cuándo salió LangGraph?"}]})
+```
+
+**Puntos fuertes**: ecosistema de integraciones, LangSmith, LangGraph para flujos complejos.  
+**Puntos débiles**: abstracción compleja, debugging difícil, cambia rápidamente.
+
+### CrewAI
+
+Framework orientado a equipos de agentes con roles:
+
+```python
+from crewai import Agent, Task, Crew
+
+researcher = Agent(role="Investigador", goal="Encontrar información precisa", llm="claude-opus-5-5")
+writer = Agent(role="Redactor", goal="Escribir contenido claro", llm="claude-opus-5-5")
+
+task = Task(description="Investiga y escribe sobre agentes LLM", agent=researcher)
+crew = Crew(agents=[researcher, writer], tasks=[task])
+result = crew.kickoff()
+```
+
+**Puntos fuertes**: fácil para prototipos con múltiples agentes, abstracciones intuitivas.  
+**Puntos débiles**: menos control fino que LangGraph, abstracciones que ocultan el flujo real.
+
+### AutoGen (Microsoft)
+
+Framework de Microsoft para sistemas multi-agente con conversaciones entre agentes:
+
+```python
+import autogen
+
+llm_config = {"model": "claude-opus-5-5", ...}
+assistant = autogen.AssistantAgent("assistant", llm_config=llm_config)
+user_proxy = autogen.UserProxyAgent("user_proxy", human_input_mode="NEVER")
+
+user_proxy.initiate_chat(assistant, message="Escribe y ejecuta un script Python que calcule π")
+```
+
+**Puntos fuertes**: conversaciones multi-agente naturales, ejecutor de código integrado.  
+**Puntos débiles**: flujos de conversación difíciles de controlar precisamente.
+
+### Pydantic AI
+
+Framework más reciente, orientado a tipos y con soporte nativo para Pydantic:
+
+```python
+from pydantic_ai import Agent
+from pydantic import BaseModel
+
+class SearchResult(BaseModel):
+    title: str
+    summary: str
+    relevance: float
+
+agent = Agent("claude-opus-5-5", result_type=SearchResult)
+result = agent.run_sync("Busca información sobre LLM inference optimization")
+print(result.data.title)  # Tipado, no strings
+```
+
+**Puntos fuertes**: outputs tipados, integración natural con el ecosistema Pydantic/FastAPI.
+
+## Cuándo usar un framework vs código propio
+
+| Usa framework si... | Usa código propio si... |
+|---|---|
+| Necesitas muchas integraciones (vector DBs, embeddings, LLMs) | La tarea es simple y bien definida |
+| Quieres LangSmith/observabilidad integrada | Necesitas control fino del flujo |
+| El equipo ya lo conoce | La abstracción introduce bugs difíciles de depurar |
+| Necesitas LangGraph para state machines | Quieres entender exactamente qué ocurre |
+
+## La recomendación de Anthropic (Building Effective Agents, 2024)
+
+> "Empezamos con el código más simple posible. En muchos casos, los patrones simples son suficientes. Cuando añadimos frameworks, empezamos a luchar con la abstracción además del problema real."
+
+El valor de los frameworks está en las integraciones y en componentes testados como LangGraph. No está en hacer tu agente "más agéntico" o "más inteligente" — eso depende del modelo y del prompt, no del framework.

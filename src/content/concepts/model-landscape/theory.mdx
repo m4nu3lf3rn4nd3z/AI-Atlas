@@ -1,0 +1,70 @@
+El ecosistema de modelos de lenguaje cambia cada pocas semanas. Este snapshot documenta el panorama a septiembre de 2026.
+
+<Callout type="note" title="Dato con fecha">
+Los modelos específicos y sus benchmarks envejecen rápido. Esta guía describe familias y decisiones de diseño que son más estables. Para comparativas actuales: consulta LMSYS Chatbot Arena y los leaderboards de Hugging Face Open LLM.
+</Callout>
+
+## Las grandes familias
+
+### Modelos cerrados (closed-source API)
+
+Accesibles solo como API. El proveedor controla los pesos, el fine-tuning y el despliegue.
+
+| Familia | Proveedor | Puntos fuertes |
+|---|---|---|
+| Claude (Haiku / Sonnet / Opus) | Anthropic | Razonamiento, código, seguimiento de instrucciones, safety |
+| GPT-4o / o3 / o4 | OpenAI | Ecosistema amplio, visión, capacidades multimodales |
+| Gemini (Flash / Pro / Ultra) | Google | Ventana de contexto muy larga, multimodalidad, integración con Google |
+| Grok | xAI | Acceso a datos de X/Twitter en tiempo real |
+
+### Modelos open-weights
+
+Los pesos están disponibles para descargar, modificar y desplegar. Ver <Concept id="open-vs-closed">open-weights vs cerrados</Concept> para las implicaciones de licencias.
+
+| Familia | Parámetros | Proveedor | Especialidad |
+|---|---|---|---|
+| Llama 3.x | 1B–405B | Meta | Generalista, licencia permisiva |
+| Qwen 2.5 / Qwen 3 | 0.5B–72B | Alibaba | Multilingüe, código, matemáticas |
+| Mistral / Mixtral | 7B–8x22B | Mistral AI | Eficiente, europeo, open |
+| DeepSeek V3 / R1 | 7B–671B | DeepSeek | MoE muy eficiente; R1 con razonamiento |
+| Gemma 3 | 1B–27B | Google | Pequeños pero potentes, buena licencia |
+| Phi-4 | 14B | Microsoft | Enorme calidad para su tamaño |
+
+## Dimensiones para elegir un modelo
+
+### Por caso de uso
+
+- **Razonamiento y matemáticas**: DeepSeek R1, Claude (con thinking), o3/o4
+- **Código**: Claude Sonnet, GPT-4o, Qwen2.5-Coder, DeepSeek Coder
+- **Multilingüe**: Qwen (especialmente bueno en chino/español/japonés), Gemini
+- **Ventana de contexto larga**: Gemini 1.5/2 (2M tokens), Claude (200k), GPT-4o (128k)
+- **Velocidad y coste**: Gemini Flash, Claude Haiku, Llama pequeños (1–3B)
+
+### Por tipo de despliegue
+
+- **API managed**: cualquier proveedor grande
+- **Local / edge**: modelos GGUF Q4 de 1–7B vía Ollama
+- **On-premise**: modelos open-weights con vLLM o llama.cpp
+- **Self-hosted en GPU de consumo**: 7–8B en Q4, QLoRA si necesitas fine-tuning
+
+## Modelos de razonamiento ("thinking")
+
+Una categoría especial que usa **extended thinking** o **chain-of-thought interno** para resolver problemas complejos:
+
+- **o3/o4 (OpenAI)**: razonamiento largo, excelente en matemáticas y ciencia
+- **Claude con thinking adaptativo**: el modelo alterna entre pensar y responder según la dificultad
+- **DeepSeek R1**: razonamiento open-weights, muy competitivo con modelos cerrados
+
+Estos modelos son más lentos y caros por respuesta, pero mucho más precisos en tareas que requieren múltiples pasos de razonamiento.
+
+## Mixture of Experts (MoE)
+
+Algunos modelos grandes usan arquitectura MoE: la red tiene muchos "expertos" pero solo activa una fracción de ellos por token. Mixtral 8x7B tiene 56B parámetros totales pero activa solo 14B por token.
+
+Ventaja: calidad de un modelo grande al coste de uno más pequeño en tiempo de inferencia. Desventaja: carga todos los parámetros en VRAM.
+
+## El principio de Pareto
+
+Para la mayoría de casos de uso, el **modelo 7–8B open-weights más reciente** supera al estado del arte de 2–3 años atrás. Llama 3.1 8B (2024) es comparable a GPT-3.5 (2022) en muchas tareas, a una fracción del coste.
+
+El principio práctico: **empieza con el modelo más barato que puedas probar**, mide con <Concept id="evals">evals</Concept>, y sube de tamaño solo si los resultados no son suficientes.

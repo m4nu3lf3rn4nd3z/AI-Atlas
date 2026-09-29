@@ -1,15 +1,10 @@
-import { Check, ChevronsDownUp, ChevronsUpDown, ListTree, SlidersHorizontal, Spline } from 'lucide-react'
-import { Popover } from 'radix-ui'
+import { Check, ChevronsDownUp, ChevronsUpDown, ListTree } from 'lucide-react'
 import { conceptsInLayer } from '@/content'
-import type { EdgeType } from '@/content/graph'
-import { LAYERS, RELATION_LABELS } from '@/content/layers'
+import { LAYERS } from '@/content/layers'
 import type { LayerId } from '@/content/schema'
 import { cn } from '@/lib/cn'
 import { useProgress } from '@/stores/progress'
 import { useUi } from '@/stores/ui'
-import { EDGE_DASH } from './edgeStyle'
-
-const EDGE_TYPES = Object.keys(RELATION_LABELS) as EdgeType[]
 
 const pill =
   'flex h-8 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border px-2.5 text-[12.5px] font-medium transition-colors [&_svg]:size-3.5'
@@ -20,10 +15,6 @@ export function MapControls({ current, onJump }: { current: LayerId; onJump: (id
   const progress = useProgress((s) => s.concepts)
   const prereqMode = useUi((s) => s.prereqMode)
   const setPrereqMode = useUi((s) => s.setPrereqMode)
-  const showLines = useUi((s) => s.showLines)
-  const setShowLines = useUi((s) => s.setShowLines)
-  const hidden = useUi((s) => s.hiddenEdgeTypes)
-  const toggleEdgeType = useUi((s) => s.toggleEdgeType)
   const collapsed = useUi((s) => s.collapsedLayers)
   const setCollapsed = useUi((s) => s.setCollapsed)
   const allCollapsed = collapsed.length === LAYERS.length
@@ -66,73 +57,6 @@ export function MapControls({ current, onJump }: { current: LayerId; onJump: (id
           <ListTree />
           ¿Qué necesito antes?
         </button>
-        <button
-          type="button"
-          onClick={() => setShowLines(!showLines)}
-          aria-pressed={showLines}
-          className={cn(pill, showLines ? pillOn : pillOff)}
-          title="Dibujar líneas hacia los conceptos relacionados"
-        >
-          <Spline />
-          Líneas
-        </button>
-        <Popover.Root>
-          <Popover.Trigger asChild>
-            <button type="button" className={cn(pill, pillOff)}>
-              <SlidersHorizontal />
-              Relaciones
-              {hidden.length > 0 && (
-                <span className="rounded bg-surface-3 px-1 font-mono text-[10px]">
-                  {EDGE_TYPES.length - hidden.length}/{EDGE_TYPES.length}
-                </span>
-              )}
-            </button>
-          </Popover.Trigger>
-          <Popover.Portal>
-            <Popover.Content
-              align="start"
-              sideOffset={6}
-              className="z-40 w-64 rounded-xl border border-border bg-surface p-2 shadow-xl shadow-black/30"
-            >
-              <p className="px-2 pt-1 pb-2 text-[11.5px] leading-snug text-subtle">
-                Qué tipos de relación se muestran. Las flechas apuntan a aquello de lo que depende o sobre lo
-                que actúa el concepto de origen.
-              </p>
-              {EDGE_TYPES.map((t) => {
-                const on = !hidden.includes(t)
-                return (
-                  <button
-                    key={t}
-                    type="button"
-                    onClick={() => toggleEdgeType(t)}
-                    className="flex w-full cursor-pointer items-center gap-3 rounded-lg px-2 py-1.5 text-left text-[12.5px] hover:bg-surface-2"
-                  >
-                    <span
-                      className={cn(
-                        'flex size-4 items-center justify-center rounded border',
-                        on ? 'border-accent bg-accent text-accent-fg' : 'border-border-strong',
-                      )}
-                    >
-                      {on && <Check className="size-3" strokeWidth={3} />}
-                    </span>
-                    <svg width="28" height="8" aria-hidden>
-                      <line
-                        x1="0"
-                        y1="4"
-                        x2="28"
-                        y2="4"
-                        strokeWidth="1.5"
-                        strokeDasharray={EDGE_DASH[t]}
-                        style={{ stroke: 'var(--fg-muted)' }}
-                      />
-                    </svg>
-                    <span className={on ? 'text-fg' : 'text-subtle'}>{RELATION_LABELS[t].label}</span>
-                  </button>
-                )
-              })}
-            </Popover.Content>
-          </Popover.Portal>
-        </Popover.Root>
         <button
           type="button"
           onClick={() => setCollapsed(allCollapsed ? [] : LAYERS.map((l) => l.id))}

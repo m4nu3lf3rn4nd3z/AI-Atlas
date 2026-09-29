@@ -1,0 +1,106 @@
+Los sistemas **multi-agente** distribuyen el trabajo entre múltiples modelos que colaboran: se especializan, se verifican mutuamente, o trabajan en paralelo sobre partes independientes de un problema.
+
+No son simplemente "más agentes = mejor". La complejidad crece con el número de agentes, y la mayoría de problemas no los requieren.
+
+## Por qué múltiples agentes
+
+Un único agente con una ventana de contexto larga puede resolver muchas tareas. Los sistemas multi-agente aportan valor específicamente cuando:
+
+1. **El problema es demasiado grande para una ventana de contexto** — dividir en subtareas manejables
+2. **Partes independientes que pueden hacerse en paralelo** — reducir el tiempo total
+3. **Necesitas verificación independiente** — un agente genera, otro critica
+4. **Especialización** — diferentes agentes tienen acceso a diferentes herramientas o prompts
+
+## Patrones de coordinación
+
+### Supervisor ↔ Subagentes
+
+Un agente orquestador divide la tarea y delega a workers especializados:
+
+```
+Supervisor: "Investiga y escribe un informe sobre LLMs en medicina"
+  ├── Worker-Research: busca artículos, extrae datos
+  ├── Worker-Analysis: analiza tendencias y limitaciones
+  └── Worker-Writer: redacta el informe con los datos recibidos
+```
+
+El supervisor toma las decisiones de alto nivel; los workers ejecutan sin conocer el contexto global.
+
+### Peer-to-peer (colaborativo)
+
+Varios agentes iguales se pasan resultados entre sí:
+
+```
+Agente A: genera código → Agente B: revisa el código → Agente C: escribe tests
+```
+
+### Adversarial (evaluador-generador)
+
+Un agente genera, otro critica desde una perspectiva diferente:
+
+```
+Agente "Defensor": argumenta a favor de una propuesta
+Agente "Abogado del diablo": busca fallos y contraargumentos
+→ Humano decide basándose en ambas perspectivas
+```
+
+## El problema de la coordinación
+
+### ¿Cómo se comunican los agentes?
+
+Las formas más comunes:
+
+- **Shared memory/state**: todos los agentes leen y escriben en un estado compartido (con riesgo de condiciones de carrera si es síncrono)
+- **Message passing**: los agentes se envían mensajes; cada uno reacciona a lo que recibe
+- **Blackboard**: sistema centralizado donde los agentes leen y escriben resultados
+
+### ¿Cómo prevenir loops y fallos en cascada?
+
+```python
+MAX_ITERATIONS = 10
+
+class AgentCoordinator:
+    def run(self, task: str) -> str:
+        context = {"task": task, "completed_subtasks": [], "iteration": 0}
+        while not self.is_complete(context):
+            if context["iteration"] >= MAX_ITERATIONS:
+                raise MaxIterationsExceeded(f"Límite de {MAX_ITERATIONS} iteraciones alcanzado")
+            next_action = self.supervisor.decide(context)
+            result = self.execute(next_action)
+            context = self.update(context, result)
+            context["iteration"] += 1
+        return context["final_answer"]
+```
+
+## Comunicación entre agentes: A2A y MCP
+
+Los protocolos estándar permiten que agentes de diferentes frameworks y proveedores colaboren:
+
+- **<Concept id="mcp">MCP</Concept>**: permite que un agente use herramientas de un servidor como si fueran propias
+- **<Concept id="a2a">A2A</Concept>** (Agent-to-Agent): protocolo de Google para delegar tareas entre agentes como servicios HTTP
+
+Sin estándares, cada implementación multi-agente es ad-hoc e incompatible.
+
+## Los riesgos específicos de sistemas multi-agente
+
+<Callout type="tradeoff" title="Mayor complejidad = mayor superficie de ataque">
+En un sistema multi-agente, la <Concept id="prompt-injection">prompt injection</Concept> en un solo agente puede propagarse a través de todo el sistema si los agentes se pasan resultados sin sanitizar. Un worker que procesa contenido externo puede infectar al supervisor.
+</Callout>
+
+| Riesgo | Mitigación |
+|---|---|
+| Prompt injection en cadena | Cada agente valida inputs externos; no confiar en mensajes de otros agentes sin validación |
+| Bucles infinitos | Límites de iteración y timeouts en todos los ciclos |
+| Acumulación de costes | Presupuesto de tokens/coste por tarea con fail-safe |
+| Fallos en cascada | Agentes robustos a fallos del vecino; circuit breakers |
+| Dificultad de debugging | Trazas detalladas de cada agente con su contexto y decisiones |
+
+## ¿Cuándo NO usar multi-agente?
+
+La respuesta correcta para la mayoría de problemas es **un solo agente bien diseñado** o un **workflow con un LLM**. Multi-agente tiene sentido cuando:
+
+- Tienes evidencia clara de que un agente solo no puede hacer la tarea (contexto insuficiente, necesidad de especialización real)
+- Los beneficios de la paralelización justifican el overhead de coordinación
+- Tienes infraestructura para monitorear y depurar sistemas distribuidos
+
+Un sistema de 5 agentes que hace lo que puede hacer 1 es overhead, no arquitectura.

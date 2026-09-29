@@ -1,0 +1,105 @@
+El rendimiento de un LLM no lo determinan solo los pesos: **todo lo que metes en la ventana de contexto es ingeniería**. El system prompt, los ejemplos, el orden de los datos, el formato de salida esperado — cada decisión de diseño impacta en la calidad del resultado.
+
+## La ventana como recurso
+
+Piensa en la ventana de contexto como la memoria de trabajo del modelo para esa petición. Cada token que entra cuesta dinero y contribuye al razonamiento. Un contexto bien estructurado permite al modelo distinguir instrucciones, datos y ejemplos, y reduce la probabilidad de que se confunda o contradiga.
+
+```
+┌─────────────────────────────────────────────────┐
+│  SYSTEM PROMPT (instrucciones fijas)             │
+│  ┌─────────────────────────────────────────────┐ │
+│  │  Ejemplos (few-shot) · opcional             │ │
+│  └─────────────────────────────────────────────┘ │
+│  ┌─────────────────────────────────────────────┐ │
+│  │  Datos del usuario (RAG, documentos…)       │ │
+│  └─────────────────────────────────────────────┘ │
+│  ┌─────────────────────────────────────────────┐ │
+│  │  Petición del usuario                       │ │
+│  └─────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────┘
+```
+
+## Técnicas fundamentales
+
+### Zero-shot vs Few-shot
+
+**Zero-shot**: solo describes la tarea. Funciona bien para modelos grandes en tareas comunes.
+
+```
+Clasifica este texto como positivo, negativo o neutro.
+Texto: "El modelo tardó más de lo esperado pero el resultado fue correcto."
+```
+
+**Few-shot**: incluyes ejemplos del formato entrada → salida esperado. Indispensable para formatos no convencionales o criterios difíciles de verbalizar.
+
+```
+Clasifica el sentimiento. Ejemplos:
+- "Entrega rapidísima" → positivo
+- "No funcionó como esperaba" → negativo
+- "Llegó en el plazo previsto" → neutro
+
+Texto: "El modelo tardó más de lo esperado pero el resultado fue correcto."
+```
+
+<Callout type="insight" title="Cuántos ejemplos few-shot">
+Más no siempre es mejor. Con modelos grandes, 3–5 ejemplos bien elegidos suelen ser suficientes. Más de 10 raramente mejora y añade tokens de entrada. Prioriza variedad sobre cantidad: cubre los casos que más varían o los que el modelo suele equivocarse.
+</Callout>
+
+### Chain-of-thought (CoT)
+
+Pedirle al modelo que razone paso a paso antes de dar la respuesta mejora significativamente tareas de razonamiento complejo (matemáticas, código, análisis lógico).
+
+```
+Problema: tengo 5 cajas con 12 libros cada una y vendo 18 libros. ¿Cuántos me quedan?
+Razona paso a paso antes de responder.
+```
+
+Con los modelos modernos de razonamiento (Claude, o1, R1), el razonamiento ocurre internamente. Para modelos sin razonamiento nativo, solicitar CoT explícitamente sigue siendo útil.
+
+### Estructura y delimitadores
+
+Separar las secciones del prompt con delimitadores claros (<em>XML tags, markdown headers, líneas de separación</em>) ayuda al modelo a entender qué es instrucción, qué son datos y qué es la petición:
+
+```xml
+<instrucciones>
+Eres un asistente de soporte técnico. Responde solo con la información del documento.
+Si la respuesta no está en el documento, di "No lo sé."
+</instrucciones>
+
+<documento>
+{contexto_recuperado}
+</documento>
+
+<pregunta>{pregunta_usuario}</pregunta>
+```
+
+### Especificar el formato de salida
+
+Si necesitas parsear la respuesta, pide el formato explícitamente. Para JSON estructurado, combina con <Concept id="structured-outputs">structured outputs</Concept> para garantía adicional.
+
+```
+Responde en JSON con este esquema:
+{"clasificacion": "positivo|negativo|neutro", "confianza": 0-1, "razon": "string"}
+```
+
+## Context engineering: más allá del system prompt
+
+En 2025, el foco se desplazó del "prompt engineering" al "context engineering": diseñar todo lo que entra en la ventana, no solo las instrucciones.
+
+- **Prompt caching**: si tienes un system prompt largo o documentos estáticos, posiciónalo al principio para beneficiarte del caché de prefill (reducción de coste y latencia de hasta 90 %).
+- **Posición del documento**: en contextos muy largos, los modelos tienden a recordar mejor el principio y el final. Pon la información más crítica al inicio o al final.
+- **Ventana limpia**: elimina los mensajes del historial que ya no son relevantes. Un contexto más corto y limpio suele dar mejores resultados que uno largo con ruido.
+
+<Callout type="tradeoff" title="Prompt engineering vs fine-tuning">
+El prompt engineering es siempre el primer paso: es barato, rápido y reversible. El fine-tuning añade complejidad, coste y tiempo de entrenamiento. Antes de fine-tunear, agota los few-shot examples, el CoT, y ajusta el system prompt. <Concept id="prompt-rag-finetune">¿Cuándo hace falta cada uno?</Concept>
+</Callout>
+
+## Errores comunes y cómo evitarlos
+
+| Error | Causa | Solución |
+|---|---|---|
+| Instrucciones contradictorias | System prompt y mensaje del usuario se contradicen | Revisa que el system prompt cubra los casos extremos |
+| "Haz lo que quieras" | System prompt demasiado vago | Sé específico: qué hacer Y qué no hacer |
+| Formato de salida inconsistente | No especificas el formato | Define el esquema exacto + ejemplo |
+| Context stuffing | Inyectar todo el documento sin filtrar | Usa RAG para traer solo el fragmento relevante |
+| Over-prompting | Instrucciones tan largas que el modelo las ignora | Simplifica; menos instrucciones, más claras |

@@ -1,15 +1,14 @@
-import { ChevronDown } from 'lucide-react'
+import { Check, ChevronDown, FlaskConical } from 'lucide-react'
 import type { CSSProperties } from 'react'
 import { conceptsInLayer, hasContent } from '@/content'
 import type { Layer } from '@/content/layers'
 import { cn } from '@/lib/cn'
-import { useProgress } from '@/stores/progress'
+import { statusOf, useProgress } from '@/stores/progress'
 import { useUi } from '@/stores/ui'
 import { PROGRESS_STYLE, progressState } from '../progress/status'
-import { ConceptCard } from './ConceptCard'
 import { useHighlight } from './highlight'
 
-/* One layer of the stack: a collapsible band with its concepts. */
+/* One layer of the stack: a collapsible band with its concepts as a bullet list. */
 export function LayerBand({ layer, onOpen }: { layer: Layer; onOpen: (id: string) => void }) {
   const concepts = conceptsInLayer(layer.id)
   const collapsed = useUi((s) => s.collapsedLayers.includes(layer.id))
@@ -76,10 +75,56 @@ export function LayerBand({ layer, onOpen }: { layer: Layer; onOpen: (id: string
       </button>
 
       {!collapsed && (
-        <div className="grid gap-2.5 px-4 pb-4 [grid-template-columns:repeat(auto-fill,minmax(min(100%,220px),1fr))]">
-          {concepts.map((c) => (
-            <ConceptCard key={c.id} concept={c} onOpen={onOpen} />
-          ))}
+        <div className="px-4 pb-4">
+          <div className="divide-y divide-border/40 rounded-xl border border-border/40 bg-bg/30">
+            {concepts.map((c) => {
+              const writ = hasContent(c.id)
+              const status = statusOf(progress[c.id])
+              return (
+                <button
+                  key={c.id}
+                  type="button"
+                  data-concept={c.id}
+                  onClick={() => onOpen(c.id)}
+                  aria-label={`${c.title}. ${c.short}`}
+                  className="group flex w-full cursor-pointer items-center gap-3 px-3 py-2.5 text-left transition-colors first:rounded-t-xl last:rounded-b-xl hover:bg-surface-2"
+                >
+                  <span
+                    className="mt-px size-2 shrink-0 rounded-full"
+                    style={{
+                      background: layer.color,
+                      opacity: writ ? 0.85 : 0.25,
+                    }}
+                  />
+                  <span className="min-w-0 flex-1">
+                    <span className={cn('block text-[13.5px] font-medium leading-snug', writ ? 'text-fg' : 'text-muted')}>
+                      {c.title}
+                    </span>
+                    <span className="block truncate text-[12px] leading-snug text-subtle">{c.short}</span>
+                  </span>
+                  <span className="flex shrink-0 items-center gap-2">
+                    {c.labId && (
+                      <FlaskConical
+                        className="size-3.5 text-subtle opacity-60 group-hover:opacity-100"
+                        aria-label="Tiene lab"
+                      />
+                    )}
+                    {status === 'learned' && (
+                      <span className="flex size-4 items-center justify-center rounded-full bg-ok/15 text-ok" title="Aprendido">
+                        <Check className="size-2.5" strokeWidth={3} />
+                      </span>
+                    )}
+                    {status === 'visited' && (
+                      <span className="size-2 rounded-full bg-[var(--layer)] opacity-70" title="Visitado" />
+                    )}
+                    {!writ && (
+                      <span className="font-mono text-[10px] text-subtle">pronto</span>
+                    )}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
         </div>
       )}
     </section>

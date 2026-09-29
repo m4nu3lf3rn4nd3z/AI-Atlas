@@ -1,0 +1,102 @@
+Los sistemas con LLMs son **no deterministas**: el mismo input puede producir respuestas distintas, y "funciona en el demo" no garantiza que funcione para el rango completo de inputs reales. Las **evals** son el equivalente de los tests unitarios para sistemas de IA: miden si el sistema cumple lo que se le pide, de forma repetible.
+
+## Por qué las evals son distintas a los tests clásicos
+
+Un test unitario verifica comportamiento binario (pasa/falla). Una eval mide **grado de calidad** sobre una distribución de inputs:
+
+| Tests clásicos | Evals |
+|---|---|
+| `assert output == expected` | Score 0–1 sobre un criterio |
+| Determinista | Estocástico |
+| Falla o pasa | Umbral de calidad |
+| Cobertura de código | Cobertura de casos de uso |
+
+Necesitas evals para:
+- Saber si un cambio de prompt mejora o empeora el sistema
+- Detectar regresiones antes de desplegar
+- Comparar modelos para tu caso de uso
+- Medir el impacto de añadir RAG, un reranker, guardrails, etc.
+
+## Tipos de evals por método de evaluación
+
+### 1. Métricas automáticas deterministas
+
+Para tareas con respuesta exacta conocida:
+- **Exact match**: la respuesta coincide exactamente con la referencia
+- **F1 sobre tokens**: mide solapamiento (útil en QA extractivo)
+- **ROUGE**: para resúmenes
+- **Pass@k**: el código generado pasa los tests en k intentos (evaluación de código)
+
+```python
+def exact_match(prediction: str, ground_truth: str) -> float:
+    return 1.0 if prediction.strip().lower() == ground_truth.strip().lower() else 0.0
+```
+
+### 2. Métricas de RAG
+
+Para sistemas de recuperación y generación:
+- **Context precision**: de lo recuperado, ¿qué porcentaje es realmente relevante?
+- **Context recall**: de lo que debería recuperar, ¿qué porcentaje recuperó?
+- **Faithfulness**: ¿la respuesta está fundamentada en el contexto recuperado o es una alucinación?
+- **Answer relevancy**: ¿la respuesta responde a la pregunta?
+
+### 3. LLM-as-judge
+
+Un modelo evalúa la respuesta de otro modelo según una rúbrica. Escalable y flexible, pero con sesgos conocidos (ver <Concept id="llm-as-judge">LLM-as-judge</Concept>).
+
+```python
+RUBRICA = """Evalúa la respuesta según estos criterios (1-5):
+- Corrección: ¿la información es factualmente correcta?
+- Completitud: ¿responde a todos los aspectos de la pregunta?
+- Claridad: ¿es fácil de entender?
+Devuelve JSON: {"corrección": N, "completitud": N, "claridad": N, "justificación": "..."}"""
+```
+
+<Callout type="insight" title="Empieza pequeño">
+Un dataset de 50-100 casos representativos y bien seleccionados es más valioso que 10.000 casos aleatorios. Empieza con los casos donde el sistema falla más, los casos límite, y una muestra representativa del tráfico real. Crece el dataset con cada fallo nuevo que encuentres.
+</Callout>
+
+## Cómo construir un dataset de eval
+
+1. **Prod traces** (lo mejor): extraer pares input/output reales del sistema, anotar los fallos
+2. **Generación sintética**: pedir a un LLM que genere inputs variados; revisar manualmente
+3. **Anotación humana**: golden answers escritas por expertos del dominio
+4. **Casos de fallo conocidos**: casos donde el sistema falló en el pasado
+
+El dataset de eval tiene dos partes:
+- **Test inputs**: las preguntas o tareas que el sistema debe resolver
+- **Ground truth**: la respuesta correcta, la anotación de calidad, o los criterios de evaluación
+
+## Evals offline vs online
+
+| Offline | Online |
+|---|---|
+| Antes del despliegue | En producción |
+| Dataset fijo | Tráfico real |
+| Métricas exactas | Muestreo estadístico |
+| Para CI/CD | Para monitorización continua |
+
+Las evals online observan el sistema en producción (con muestreo para no evaluar todo) e identifican degradación silenciosa: cuando la distribución de inputs cambia y el sistema pierde calidad sin que ningún test lo detecte.
+
+<Callout type="tradeoff" title="El eval es tan bueno como su dataset">
+Un eval con un dataset sesgado o poco representativo da una falsa sensación de seguridad. Invierte en curar el dataset antes de automatizarlo. Los casos de fallo descubiertos en producción son los más valiosos.
+</Callout>
+
+## Herramientas del ecosistema
+
+| Herramienta | Enfoque |
+|---|---|
+| promptfoo | Evals de prompts, comparación A/B, CI/CD |
+| Ragas | Métricas específicas para RAG (faithfulness, context precision) |
+| Inspect (UK AISI) | Framework general, agnóstico de proveedor |
+| LangSmith / Braintrust | Plataformas con tracing + evals online |
+| DeepEval | Evals basadas en LLM-as-judge con rúbricas |
+
+## El ciclo de mejora
+
+```
+Desplegar → Monitorizar → Identificar fallos → 
+Añadir al dataset → Ejecutar evals → Mejorar → Desplegar
+```
+
+Sin evals, cada cambio al sistema (nuevo prompt, modelo distinto, RAG añadido) es un salto a ciegas. Con evals, tienes señal medible de si mejoras o emporas.

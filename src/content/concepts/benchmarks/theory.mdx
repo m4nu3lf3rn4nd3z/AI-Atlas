@@ -1,0 +1,74 @@
+Los **benchmarks** son conjuntos de tareas estandarizadas para medir las capacidades de los modelos de lenguaje. Son útiles para comparar modelos y seguir el progreso del campo, pero tienen limitaciones importantes que el desarrollador debe conocer.
+
+## Los benchmarks más citados
+
+### Conocimiento y razonamiento general
+
+- **MMLU** (Massive Multitask Language Understanding): 57 materias académicas, desde física hasta derecho. Mide conocimiento factual y razonamiento general. Un modelo de 70B alcanza ~85-90%.
+- **HellaSwag**: comprensión del lenguaje natural y sentido común. Los modelos actuales superan el 95%.
+- **ARC-Challenge**: preguntas de ciencia de grado escolar que requieren razonamiento.
+
+### Razonamiento matemático y lógico
+
+- **MATH**: problemas de matemáticas de competición. Difícil incluso para modelos grandes; mide la capacidad de razonamiento matemático paso a paso.
+- **GSM8K**: problemas de matemáticas de primaria. Los mejores modelos alcanzan >95%.
+- **BBH** (BIG-Bench Hard): tareas que los modelos no podían hacer bien antes de GPT-4.
+
+### Código
+
+- **HumanEval**: 164 problemas de programación Python; mide si el modelo puede completar funciones correctamente. Los mejores modelos alcanzan >90%.
+- **SWE-bench**: tareas reales de GitHub — corregir bugs en repos reales. Mucho más difícil; los mejores agentes de código alcanzan ~50-60%.
+
+### Contexto largo
+
+- **RULER**: mide la capacidad de recuperar y razonar sobre información en contextos largos (256k-2M tokens).
+- **Needle in a Haystack**: recuperar un dato específico ("la aguja") escondido en un documento muy largo ("el pajar").
+
+## Por qué los benchmarks tienen limitaciones
+
+### Saturación
+
+Muchos benchmarks "se saturan" cuando los modelos mejores alcanzan >95%: dejan de discriminar entre modelos. HumanEval (código básico) ya no distingue a los mejores modelos.
+
+### Contaminación de datos
+
+Si el dataset de benchmark estaba en el corpus de entrenamiento, el modelo puede "memorizar" respuestas en lugar de razonar. Imposible de verificar completamente sin acceso a los datos de entrenamiento.
+
+### Distancia del mundo real
+
+Un modelo que lidera MMLU puede ser peor que otro en tu dominio específico, tu idioma, o tu estilo de interacción. Los benchmarks miden capacidades académicas, no rendimiento en producción.
+
+### Benchmark gaming
+
+Los laboratorios pueden (y algunos hacen) fine-tunear específicamente en distribuciones similares a los benchmarks para mejorar artificialmente sus puntuaciones. Comparar benchmarks de diferentes laboratorios sin garantías de proceso es arriesgado.
+
+<Callout type="tradeoff" title="Chatbot Arena: la alternativa más fiable">
+**LMSYS Chatbot Arena** usa preferencias humanas reales: usuarios anónimos comparan dos respuestas sin saber de qué modelo vienen. El ranking resultante (sistema Elo) correlaciona mejor con la satisfacción real de usuarios que los benchmarks académicos.
+</Callout>
+
+## Cómo usar benchmarks correctamente
+
+### Como señal inicial, no como decisión final
+
+```
+Benchmarks → selección de candidatos (top 3-5 modelos que parecen buenos)
+     ↓
+Eval propia → decisión final (con tus datos reales)
+```
+
+### Leer los papers, no solo las tablas
+
+El contexto importa: ¿con cuántos shots se evaluó? ¿Qué temperatura? ¿Está en el conjunto de evaluación o de test? Un modelo que se evalúa en condiciones más favorables puede parecer mejor sin serlo.
+
+### Benchmarks especializados para casos específicos
+
+Para casos de uso especializados existen benchmarks más relevantes:
+- **MT-Bench** y **AlpacaEval**: instrucción following y conversación
+- **CyberSecEval**: seguridad de ciberseguridad
+- **MedQA**: conocimiento médico
+- **TyDiQA**: idiomas no anglófonos
+- **Spider**: text-to-SQL
+
+## El benchmark correcto para tu caso
+
+La regla práctica: antes de mirar ningún benchmark público, crea un **mini-benchmark propio** con 50-100 preguntas reales de tu caso de uso. Ese conjunto, aunque pequeño, predice mejor el rendimiento en producción que cualquier benchmark genérico.

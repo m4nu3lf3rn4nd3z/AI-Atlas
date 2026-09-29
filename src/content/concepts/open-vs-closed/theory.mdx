@@ -1,0 +1,57 @@
+Un modelo **cerrado** (o propietario) solo se accede vía API: nunca ves los pesos, pero obtienes las capacidades más avanzadas del mercado con latencia optimizada y sin gestionar infraestructura. Un modelo **open-weights** publica los parámetros para que los descargues, ejecutes y ajustes sin pasar por un proveedor.
+
+## Qué diferencia realmente a los dos modelos
+
+| Dimensión | Cerrado (API) | Open-weights |
+|---|---|---|
+| Control de datos | Los prompts viajan al proveedor | Todo se queda en tu infra |
+| Privacidad/compliance | Acuerdo de uso del proveedor | Tú controlas el dato |
+| Coste | Por token (predecible; cero infra) | Por hardware + ingeniería |
+| Customización | Solo lo que el proveedor ofrece (prompts, fine-tune con su API) | LoRA, QLoRA, DPO, cambiar todo |
+| Actualizaciones | Automáticas; pueden romper comportamientos | Pineas la versión |
+| Techo de capacidad | El mejor modelo del mercado | Limitado a lo que existe en abierto |
+
+<Callout type="insight" title="Open-weights ≠ open source">
+Publicar los pesos no garantiza libertad de uso comercial. Llama 3 tiene restricciones para empresas con más de 700 M de usuarios activos mensuales. Qwen 3 usa Apache 2.0, que es permisivo. Mistral 7B usa Apache 2.0. Gemma permite uso derivado pero no es Apache. Lee la licencia antes de construir sobre ella.
+</Callout>
+
+## El espectro de privacidad
+
+La decisión rara vez es binaria. Existen tres zonas intermedias:
+
+1. **API con región fija o VPC**: mismo modelo, misma API, los datos no salen de tu región (AWS Bedrock, Azure OpenAI con VNET, GCP Vertex). Resuelve la mayoría de los requisitos de residencia de datos sin que gestiones hardware.
+2. **Despliegue on-premise del proveedor**: Claude Enterprise on-premise o GPT Enterprise con servidores propios. Compliance total, coste de infra alto.
+3. **Open-weights en tu clúster**: máximo control, máximo coste de ingeniería. Para la mayoría de empresas esto solo es rentable si el volumen de tokens lo justifica o si la customización es crítica.
+
+## Cuándo elegir cada opción
+
+**Elige API cerrada si:**
+- Quieres las máximas capacidades y vas rápido
+- El dato puede salir de tu entorno (o tienes un acuerdo BAA/DPA con el proveedor)
+- No tienes equipo de MLOps para gestionar serving
+
+**Elige open-weights si:**
+- Los datos son ultra-sensibles o la ley impide enviarlos a terceros
+- Necesitas customización profunda (cambiar el comportamiento base, no solo el prompt)
+- El volumen de inferencia justifica el coste del hardware propio
+- Quieres reproducibilidad absoluta (pinear una versión para siempre)
+
+**Combina los dos si:**
+- El modelo pequeño open-weights maneja el 80 % del tráfico; el cerrado se reserva para tareas difíciles (cascadas de modelos)
+- Usas el cerrado para prototipo y migras si hay tracción
+
+<Callout type="tradeoff" title="El coste real del open-weights">
+El precio por token de un open-weights en tu hardware parece cero, pero suma servidores GPU (un H100 renta a ~$2–3/h), ingeniería de MLOps, actualizaciones de seguridad, y el coste de oportunidad de no estar en la frontera de capacidades. Para la mayoría de startups, la API cerrada es más barata hasta un volumen significativo.
+</Callout>
+
+## Licencias que hay que conocer
+
+| Licencia | Uso comercial | Modificación | Ejemplos de modelos |
+|---|---|---|---|
+| Apache 2.0 | Sí | Sí | Qwen3 (la mayoría), Mistral 7B/8x7B |
+| MIT | Sí | Sí | Phi-3-mini |
+| Llama Community | Sí (con restricciones) | Sí | Llama 3.x (Meta) |
+| Gemma ToS | Sí (con restricciones) | Sí | Gemma 2, Gemma 3 |
+| Research only | No | Depende | Modelos académicos |
+
+Consulta siempre la licencia en la model card del <Concept id="hugging-face">Hugging Face Hub</Concept>.

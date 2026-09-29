@@ -1,0 +1,97 @@
+Elegir el modelo correcto para una tarea es una decisión de ingeniería, no de marketing. Los modelos más grandes no son siempre los mejores para cada caso, y los más caros no son siempre los más precisos en tu dominio específico.
+
+## El proceso de decisión
+
+### Paso 1: Definir el criterio de éxito
+
+Antes de mirar benchmarks o precios, define qué significa "funciona bien" para tu caso:
+
+- ¿Qué tasa de error es aceptable?
+- ¿Cuánto tiempo de respuesta es tolerable?
+- ¿Cuál es el presupuesto de coste por consulta?
+- ¿Qué idiomas necesitas?
+- ¿Qué longitud de contexto necesitas?
+
+Sin criterios claros, comparar modelos es navegar sin brújula.
+
+### Paso 2: Evaluar con datos propios
+
+Los benchmarks académicos (MMLU, HumanEval, MATH) miden capacidades generales. Para elegir un modelo en producción, necesitas **evals con tu distribución real de inputs**:
+
+```python
+# dataset con tus casos reales
+eval_cases = [
+    {"input": "consulta real de usuario 1", "expected_behavior": "..."},
+    {"input": "consulta real de usuario 2", "expected_behavior": "..."},
+    # ...50-200 casos representativos
+]
+
+# Ejecutar con 2-3 candidatos y comparar
+for model in ["claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-4-5-20251001"]:
+    score = run_eval(model, eval_cases)
+    cost = calculate_cost(model, eval_cases)
+    print(f"{model}: score={score:.2f}, cost_per_query=${cost:.4f}")
+```
+
+### Paso 3: Calcular el coste real de la tarea (no por token)
+
+El coste por token es una métrica engañosa. Lo que importa es el coste por **tarea completada con éxito**:
+
+```
+coste_real = (tokens_input × precio_input + tokens_output × precio_output) / tasa_de_éxito
+
+Si Claude Haiku tiene tasa_de_éxito=0.70 y Claude Opus tiene tasa_de_éxito=0.95:
+Haiku: ($0.001 / 0.70) = $0.00143 por tarea exitosa
+Opus: ($0.015 / 0.95) = $0.01579 por tarea exitosa
+```
+
+En este ejemplo Haiku sigue siendo 10x más barato. Pero si la tasa de éxito de Haiku fuera 0.20 y la de Opus 0.95, la diferencia se invierte.
+
+## Dimensiones de decisión
+
+### Latencia
+
+| Prioridad | Elección |
+|---|---|
+| TTFT < 500ms (respuesta "instantánea") | Haiku, Flash, modelos pequeños |
+| Latencia total baja | Sonnet, modelos medianos |
+| La latencia no importa (batch) | Opus, modelos grandes, batch API |
+
+### Contexto
+
+- **< 32k tokens**: cualquier modelo moderno
+- **32k–200k tokens**: Claude (200k), GPT-4o (128k), la mayoría de Sonnet/Haiku
+- **> 200k tokens**: Gemini 1.5/2 (hasta 2M), o fragmentación + RAG
+
+### Idioma
+
+- **Inglés**: todos los modelos son buenos
+- **Español, francés, alemán**: Qwen, Claude, GPT-4o son buenos
+- **Chino, japonés, coreano**: Qwen destaca significativamente
+- **Idiomas menos comunes**: verificar con eval específica
+
+### Modalidad
+
+- **Solo texto**: todos los modelos frontier
+- **Visión (imágenes)**: Claude Sonnet/Opus con visión, GPT-4o, Gemini
+- **Audio**: Whisper (transcripción), Gemini (audio nativo)
+- **Código**: Claude, GPT-4o, DeepSeek Coder, Qwen2.5-Coder
+
+## El patrón de routing por coste
+
+En sistemas con variedad de consultas, el routing automático puede optimizar el coste sin sacrificar calidad:
+
+```
+Input → Clasificador de complejidad → 
+  "Simple" → Haiku ($$$)
+  "Medio" → Sonnet ($$$$)
+  "Complejo" → Opus ($$$$$)
+```
+
+Para implementarlo: empieza con el modelo más grande, evalúa qué porcentaje de casos pasa igual con un modelo más pequeño, y solo rutea esos casos al modelo barato.
+
+## Lo que los modelos NO te dicen
+
+- **El cambio de comportamiento entre versiones**: una actualización del proveedor puede cambiar el comportamiento del modelo sin que cambies nada en tu código. Monitoriza en producción.
+- **La degradación por hora/día**: algunos modelos tienen variabilidad de calidad según la carga del proveedor.
+- **La posición en el ranking cambia mensualmente**: el modelo que lidera el benchmark hoy puede no serlo en 3 meses.

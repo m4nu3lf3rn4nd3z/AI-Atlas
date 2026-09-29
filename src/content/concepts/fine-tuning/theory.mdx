@@ -1,0 +1,122 @@
+El **fine-tuning** adapta los pesos de un modelo pre-entrenado a un dominio o tarea específica. A diferencia del prompting, que solo guía la atención del modelo durante la inferencia, el fine-tuning cambia lo que el modelo "sabe" permanentemente.
+
+Pero antes de hacer fine-tuning, la pregunta correcta es: **¿realmente necesitas hacerlo?**
+
+<Callout type="tradeoff" title="¿Cuándo vale la pena?">
+Fine-tuning tiene coste alto en datos, compute y mantenimiento. Muchos casos que parecen requerir fine-tuning se resuelven mejor (o igual de bien) con un buen prompt o con RAG. Mira la comparativa en <Concept id="prompt-rag-finetune">¿Prompt, RAG o fine-tuning?</Concept>
+</Callout>
+
+## Por qué fine-tuning y no solo prompting
+
+Fine-tuning sí añade valor cuando:
+
+1. **Formato muy específico** que el modelo base no sigue consistentemente (output estructurado complejo, estilo de escritura concreto, formato de dominio)
+2. **Dominio muy especializado** con terminología que el modelo no conoce (medicina, derecho, código de una empresa)
+3. **Latencia o coste** — un modelo 7B fine-tuneado puede superar a un 70B general en la tarea específica, a una fracción del coste
+4. **Comportamiento SFT/RLHF** — enseñar al modelo *cómo se espera que actúe*, no solo qué saber
+
+## SFT: Supervised Fine-Tuning
+
+El método más directo. Se entrena el modelo para que dado un input genere un output específico:
+
+```python
+# Formato típico de dataset SFT (formato chat)
+{
+  "messages": [
+    {"role": "system", "content": "Eres un asistente de soporte técnico."},
+    {"role": "user", "content": "El error 502 aparece intermitentemente"},
+    {"role": "assistant", "content": "El error 502 (Bad Gateway) intermitente suele indicar..."}
+  ]
+}
+```
+
+El dataset puede tener desde **cientos** (fine-tuning de estilo) hasta **decenas de miles** (nueva capacidad) de ejemplos. La calidad importa más que la cantidad.
+
+## LoRA y QLoRA: fine-tuning eficiente
+
+Hacer fine-tuning completo de un modelo de 70B requiere ~600 GB de VRAM — inaccesible para la mayoría. **LoRA** (Low-Rank Adaptation) soluciona esto:
+
+En lugar de modificar todos los pesos del modelo, LoRA añade matrices pequeñas de rango bajo a capas específicas:
+
+```
+peso_original (frozen) + ΔW (entrenable)
+donde ΔW = A × B, con A∈R^{d×r} y B∈R^{r×k}, r << d,k
+```
+
+- El modelo base se congela (no se entrena)
+- Solo se entrena el adapter LoRA (~0.1–1% de parámetros)
+- Al final, se puede mezclar con el modelo base o mantener separado
+
+**QLoRA** combina LoRA con cuantización del modelo base a 4 bits:
+
+```python
+from transformers import AutoModelForCausalLM, BitsAndBytesConfig
+from peft import get_peft_model, LoraConfig
+
+# Cargar modelo base en 4-bit
+bnb_config = BitsAndBytesConfig(
+    load_in_4bit=True,
+    bnb_4bit_compute_dtype=torch.bfloat16,
+    bnb_4bit_quant_type="nf4",
+)
+model = AutoModelForCausalLM.from_pretrained("meta-llama/Llama-3.1-8B", quantization_config=bnb_config)
+
+# Añadir adapter LoRA
+lora_config = LoraConfig(
+    r=16,             # rango del adapter
+    lora_alpha=32,    # escala
+    target_modules=["q_proj", "v_proj"],  # qué capas
+    lora_dropout=0.05,
+)
+model = get_peft_model(model, lora_config)
+```
+
+QLoRA permite hacer fine-tuning de un modelo de 7B en una GPU de 16 GB de VRAM.
+
+## DPO: Direct Preference Optimization
+
+Mientras SFT enseña "qué responder", **DPO** enseña "cuál de estas dos respuestas es mejor". Reemplaza RLHF (con reward model y PPO) por un proceso más estable.
+
+Dataset DPO: pares `{prompt, chosen, rejected}`:
+
+```json
+{
+  "prompt": "¿Cómo hackeo una red wifi?",
+  "chosen": "Entiendo tu curiosidad, pero no puedo ayudarte con eso...",
+  "rejected": "Para hackear una red wifi necesitas..."
+}
+```
+
+DPO se usa para: alineamiento, reducir respuestas dañinas, ajustar el tono, enseñar a seguir instrucciones complejas.
+
+## El pipeline completo
+
+```
+Datos crudos → Limpieza → Dataset SFT (+ DPO si aplica)
+     ↓
+Fine-tuning con LoRA/QLoRA (Unsloth, Axolotl, TRL)
+     ↓
+Adapter LoRA (.safetensors) + modelo base
+     ↓
+Merge (opcional) → Modelo completo fine-tuneado
+     ↓
+Eval contra el modelo base + evals de regresión
+```
+
+## Herramientas habituales
+
+| Herramienta | Qué aporta |
+|---|---|
+| **Unsloth** | 2x más rápido que HF, menos VRAM, muy fácil |
+| **Axolotl** | Config-based, flexible, usado en producción |
+| **LLaMA-Factory** | UI web, soporte amplio de modelos |
+| **TRL (HF)** | Librería oficial HF para SFT + DPO |
+
+## Lo que el fine-tuning no puede hacer
+
+- **Añadir conocimiento reciente** — para eso usa RAG
+- **Resolver problemas de razonamiento** del modelo base — si el base falla en lógica, el fine-tune tampoco lo arreglará
+- **Sustituir a un modelo más grande** en tareas que requieren comprensión general
+- **Ser barato de mantener** — cuando el dominio cambia, hay que repetir el proceso
+
+El éxito del fine-tuning depende más de la **calidad del dataset** que del método de entrenamiento. 50 ejemplos perfectos superan a 50.000 generados con GPT y sin revisar.

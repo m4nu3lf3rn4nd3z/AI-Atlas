@@ -1,0 +1,116 @@
+En sistemas LLM, la **observabilidad** responde a: ¿qué pasó exactamente cuando el modelo generó esa respuesta? ¿Por qué tardó tanto? ¿Cuánto costó? ¿En qué paso falló el agente?
+
+Sin trazas, depurar un pipeline de IA es imposible: los LLMs no son deterministas, el estado está en el contexto, y los errores aparecen donde menos se esperan.
+
+## El problema específico de los LLMs
+
+Las herramientas de observabilidad tradicionales (logs, métricas, traces HTTP) no capturan lo que importa en sistemas LLM:
+
+- ¿Cuál fue el prompt exacto que recibió el modelo? (crucial para reproducir errores)
+- ¿Cuántos tokens se usaron en input vs output? (afecta al coste y a la latencia)
+- ¿El agente llamó a las herramientas correctas en el orden correcto?
+- ¿La respuesta del modelo fue de alta calidad? (requiere eval, no solo métricas de sistema)
+
+## El estándar: OpenTelemetry GenAI
+
+OpenTelemetry (OTel) es el estándar de facto para trazas distribuidas. En 2024-2025, el grupo de trabajo **Semantic Conventions for GenAI** definió convenciones estándar para los spans de LLM:
+
+```
+gen_ai.operation.name = "chat"
+gen_ai.system = "anthropic"
+gen_ai.request.model = "claude-opus-5-5"
+gen_ai.usage.input_tokens = 1247
+gen_ai.usage.output_tokens = 312
+gen_ai.response.finish_reasons = ["end_turn"]
+```
+
+Ventaja: un solo backend de trazas (Jaeger, Grafana Tempo, Honeycomb, Datadog) recibe trazas de todos los componentes del sistema — la llamada HTTP al servicio, la consulta a la base de datos vectorial, y el span LLM — como una sola traza unificada.
+
+## Las plataformas especializadas
+
+Para necesidades más ricas que OTel básico (prompts completos, evals inline, comparación de versiones):
+
+| Plataforma | Qué aporta de especial |
+|---|---|
+| **LangSmith** | Deep-link a conversaciones, A/B testing de prompts, evals online automáticas |
+| **Braintrust** | Logging + evals + datasets integrados en la misma plataforma |
+| **Langfuse** | Open-source, self-hosteable, prompts versionados |
+| **Arize Phoenix** | Foco en evals y debugging de RAG; embeds y retrievals visualizables |
+
+La mayoría se instrumenta con el SDK de OpenAI/Anthropic + un patch de unas pocas líneas.
+
+## Qué medir: las métricas clave
+
+### Métricas de latencia
+
+```
+TTFT (Time To First Token) ← latencia percibida por el usuario
+TPOT (Time Per Output Token) ← velocidad de streaming
+TTL (Time To Last Token) ← latencia total
+```
+
+Para RAG: añadir latencia de retrieval (p95, p99), latencia de re-ranking.
+
+### Métricas de coste
+
+```python
+# Coste aproximado por llamada
+cost = (input_tokens / 1_000_000) * input_price + (output_tokens / 1_000_000) * output_price
+
+# Coste acumulado por sesión / usuario / feature
+daily_cost = sum(call_costs_today)
+```
+
+### Métricas de calidad (evals online)
+
+A diferencia de las métricas de sistema, la calidad requiere un evaluador:
+
+- **LLM-as-judge** automático en muestras del tráfico real
+- **Thumbs up/down** del usuario (señal débil pero barata)
+- **Tasa de fallback** (cuántas veces el agente no completó la tarea)
+
+## Tracing de agentes: el caso más complejo
+
+Un bucle agéntico puede tener decenas de pasos. La traza debe capturar:
+
+```
+Span: agente-run (total: 8.4s, $0.023)
+  ├── Span: llm-call-1 (plan) (2.1s, 1200 tokens)
+  ├── Span: tool-call: search_db (0.3s)
+  ├── Span: llm-call-2 (analyze results) (3.2s, 2800 tokens)
+  ├── Span: tool-call: write_file (0.1s)
+  └── Span: llm-call-3 (final answer) (2.7s, 890 tokens)
+```
+
+Sin esta jerarquía, es imposible saber si el agente tardó 8 segundos porque el modelo fue lento o porque la base de datos fue lenta.
+
+## Instrumentación básica con Langfuse
+
+```python
+from langfuse import Langfuse
+from langfuse.decorators import observe
+
+langfuse = Langfuse()
+
+@observe()  # Este decorador captura automáticamente inputs, outputs y tokens
+async def my_rag_pipeline(question: str) -> str:
+    # El decorador envuelve la función en una traza
+    chunks = await retrieve(question)
+    answer = await generate(question, chunks)
+    return answer
+
+# Las trazas aparecen automáticamente en la UI de Langfuse
+```
+
+<Callout type="note" title="Privacidad y PII">
+Las trazas contienen prompts y respuestas completas — datos potencialmente sensibles. Configura redaction para PII (nombres, emails, datos personales) antes de enviar trazas a plataformas externas, o usa Langfuse self-hosted.
+</Callout>
+
+## Alertas y dashboards
+
+Lo mínimo para producción:
+
+- **Alerta**: latencia p95 > umbral (usuario experimenta degradación)
+- **Alerta**: tasa de errores > X% (fallos del proveedor o bugs)
+- **Alerta**: coste diario > presupuesto (evitar sorpresas en la factura)
+- **Dashboard**: coste por feature / usuario para entender dónde va el dinero

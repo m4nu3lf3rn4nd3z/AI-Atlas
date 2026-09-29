@@ -5,25 +5,36 @@ import { Badge } from '@/components/ui/primitives'
 import { casesUsingTool } from '@/cases'
 import { getConcept } from '@/content'
 import { LAYER_BY_ID } from '@/content/layers'
-import { TOOL_CATEGORIES, TOOL_KIND_LABELS, TOOLS, TOOLS_AS_OF, type ToolCategoryId } from '@/content/tools'
+import { TOOL_CATEGORIES, TOOL_KIND_LABELS, TOOLS, TOOLS_AS_OF, type ToolCategoryId, type ToolKind } from '@/content/tools'
 import { cn } from '@/lib/cn'
 
 const norm = (s: string) => s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase()
 
+const selectCls =
+  'h-9 cursor-pointer appearance-none rounded-lg border border-border bg-surface px-3 pr-8 text-[13px] text-fg outline-none transition-colors hover:border-border-strong focus:border-accent'
+
 export default function ToolsPage() {
   const [q, setQ] = useState('')
   const [category, setCategory] = useState<ToolCategoryId | 'all'>('all')
+  const [kind, setKind] = useState<ToolKind | 'all'>('all')
   const { hash } = useLocation()
   const target = hash.slice(1)
+
+  // Available kinds change when the category filter changes.
+  const availableKinds = useMemo<ToolKind[]>(() => {
+    const pool = category === 'all' ? TOOLS : TOOLS.filter((t) => t.categories.includes(category))
+    return [...new Set(pool.map((t) => t.kind))].sort() as ToolKind[]
+  }, [category])
 
   const visible = useMemo(() => {
     const nq = norm(q)
     return TOOLS.filter(
       (t) =>
         (category === 'all' || t.categories.includes(category)) &&
+        (kind === 'all' || t.kind === kind) &&
         (!nq || norm(`${t.name} ${t.description} ${t.choose ?? ''}`).includes(nq)),
     )
-  }, [q, category])
+  }, [q, category, kind])
 
   // Arriving at /tools#id clears the filters so the card is visible…
   const [prevTarget, setPrevTarget] = useState(target)
@@ -31,6 +42,7 @@ export default function ToolsPage() {
     setPrevTarget(target)
     setQ('')
     setCategory('all')
+    setKind('all')
   }
   // …and scrolls to it.
   useEffect(() => {
@@ -39,9 +51,11 @@ export default function ToolsPage() {
 
   // With no filter each tool is listed once, under its main category.
   const sections =
-    category === 'all'
+    category === 'all' && kind === 'all'
       ? TOOL_CATEGORIES.map((c) => ({ ...c, tools: visible.filter((t) => t.categories[0] === c.id) })).filter((s) => s.tools.length > 0)
-      : TOOL_CATEGORIES.filter((c) => c.id === category && visible.length > 0).map((c) => ({ ...c, tools: visible }))
+      : category !== 'all'
+        ? TOOL_CATEGORIES.filter((c) => c.id === category && visible.length > 0).map((c) => ({ ...c, tools: visible }))
+        : [{ id: 'filtered' as ToolCategoryId, title: TOOL_KIND_LABELS[kind as ToolKind], description: '', tools: visible }]
 
   return (
     <div className="mx-auto max-w-6xl px-5 py-10 sm:px-8">
@@ -63,20 +77,46 @@ export default function ToolsPage() {
             className="h-full flex-1 bg-transparent text-[14px] outline-none placeholder:text-subtle"
           />
         </label>
-        <div className="mt-2.5 flex gap-1.5 overflow-x-auto pb-1">
-          {[{ id: 'all' as const, title: 'Todas' }, ...TOOL_CATEGORIES].map((c) => (
-            <button
-              key={c.id}
-              type="button"
-              onClick={() => setCategory(c.id)}
-              className={cn(
-                'shrink-0 cursor-pointer rounded-lg border px-2.5 py-1 text-[12px] transition-colors',
-                category === c.id ? 'border-accent/60 bg-accent-soft text-fg' : 'border-border text-muted hover:text-fg',
-              )}
+        <div className="mt-2.5 flex flex-wrap items-center gap-2">
+          <div className="relative">
+            <select
+              value={category}
+              onChange={(e) => {
+                setCategory(e.target.value as ToolCategoryId | 'all')
+                setKind('all')
+              }}
+              className={cn(selectCls, category !== 'all' && 'border-accent/60 bg-accent-soft')}
             >
-              {c.title}
+              <option value="all">Todas las categorías</option>
+              {TOOL_CATEGORIES.map((c) => (
+                <option key={c.id} value={c.id}>{c.title}</option>
+              ))}
+            </select>
+            <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-subtle">▾</span>
+          </div>
+          <div className="relative">
+            <select
+              value={kind}
+              onChange={(e) => setKind(e.target.value as ToolKind | 'all')}
+              className={cn(selectCls, kind !== 'all' && 'border-accent/60 bg-accent-soft')}
+            >
+              <option value="all">Todos los tipos</option>
+              {availableKinds.map((k) => (
+                <option key={k} value={k}>{TOOL_KIND_LABELS[k]}</option>
+              ))}
+            </select>
+            <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-subtle">▾</span>
+          </div>
+          {(category !== 'all' || kind !== 'all') && (
+            <button
+              type="button"
+              onClick={() => { setCategory('all'); setKind('all') }}
+              className="text-[12px] text-subtle hover:text-fg"
+            >
+              Limpiar filtros
             </button>
-          ))}
+          )}
+          <span className="ml-auto font-mono text-[12px] text-subtle">{visible.length} herramientas</span>
         </div>
       </div>
 

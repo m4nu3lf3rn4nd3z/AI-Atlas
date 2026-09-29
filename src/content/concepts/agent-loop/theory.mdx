@@ -1,0 +1,97 @@
+Un agente no genera una única respuesta: ejecuta un **bucle** en el que razona, actúa, observa los resultados y repite hasta completar la tarea o determinar que no puede. El patrón más conocido es **ReAct** (Reasoning + Acting), pero todos los bucles agénticos siguen la misma estructura.
+
+## El bucle en tres pasos
+
+```
+┌─────────────────────────────────────────────────────┐
+│  Contexto: tarea + historial de pasos anteriores    │
+└─────────────────────────────────────────────────────┘
+                        ↓
+         ┌──────────────────────────┐
+         │  Modelo: Thought + Action │  ← decide qué hacer
+         └──────────────────────────┘
+                        ↓
+         ┌──────────────────────────┐
+         │  Executor: ejecuta tool  │  ← tu código
+         └──────────────────────────┘
+                        ↓
+         ┌──────────────────────────┐
+         │  Observation: resultado  │  ← vuelve al contexto
+         └──────────────────────────┘
+                        ↓
+              ¿Tarea completa? → Si no, vuelve al inicio
+```
+
+En cada paso, el modelo puede:
+- **Llamar una herramienta** (search, code interpreter, API, base de datos…)
+- **Emitir la respuesta final** (`stop_reason == "end_turn"` sin tool calls)
+- **Pedir aclaración** (human-in-the-loop) si no tiene suficiente información
+
+## El patrón ReAct
+
+ReAct (Yao et al., 2022) formaliza que el modelo alterne razonamiento explícito (pensamiento) con acciones. En la práctica con los modelos modernos el razonamiento es interno (tokens de thinking) y no necesitas pedirlo explícitamente:
+
+```
+Tarea: "busca el precio de AAPL ahora y dime si ha subido esta semana"
+
+Thought: necesito el precio actual y el de hace 7 días.
+Action: get_stock_price(symbol="AAPL", date="hoy")
+Observation: 189.45
+
+Thought: ahora necesito el precio de hace 7 días.
+Action: get_stock_price(symbol="AAPL", date="hace 7 días")
+Observation: 182.10
+
+Thought: 189.45 > 182.10, así que ha subido un 4%.
+Final answer: "AAPL cotiza a $189.45, un 4% más que hace 7 días."
+```
+
+## Límites y guardrails del bucle
+
+Un bucle sin límites puede:
+- Quedarse en un bucle infinito (el modelo falla en completar la tarea y sigue intentándolo)
+- Acumular un contexto enorme (cada paso añade tokens al historial)
+- Incurrir en costes desproporcionados
+
+Guardrails mínimos que todo agente necesita:
+
+```python
+MAX_ITERATIONS = 20  # nunca más de N pasos
+MAX_TOKENS_CONTEXT = 50_000  # truncar historial si se acerca
+TIMEOUT = 120  # segundos
+
+for step in range(MAX_ITERATIONS):
+    response = call_model(messages)
+    if response.stop_reason == "end_turn":
+        return response  # terminó limpiamente
+    messages = execute_and_append(response, messages)
+
+raise AgentTimeoutError("El agente no terminó en el límite de pasos")
+```
+
+<Callout type="tradeoff" title="Agentes vs workflows deterministas">
+Los agentes deciden dinámicamente qué hacer. Los workflows (prompt chaining, routing) siguen un camino predefinido por tu código. Los workflows son más predecibles, más baratos y más fáciles de depurar. Usa agentes solo cuando la tarea es genuinamente abierta y el modelo necesita explorar. Para flujos que conoces de antemano, usa un workflow.
+</Callout>
+
+## La gestión del contexto es clave
+
+En un bucle largo, el contexto puede crecer hasta superar la ventana. Estrategias habituales:
+
+1. **Truncado**: eliminar los pasos más antiguos (pierdes información)
+2. **Resumen**: resumir los pasos anteriores con otro LLM (mantiene lo esencial)
+3. **Memoria externa**: guardar en BD lo relevante, recuperar bajo demanda (ver <Concept id="agent-memory">memoria de agentes</Concept>)
+4. **Compactación**: en agentes de larga duración (Claude Code), el sistema compacta el historial automáticamente conservando el contexto activo
+
+## Cuándo usar un agente
+
+| Señal | Implicación |
+|---|---|
+| La secuencia de pasos no se conoce de antemano | Agente |
+| La tarea depende de lo que encuentre en el paso anterior | Agente |
+| Se puede descomponer en pasos fijos | Workflow |
+| El coste de errores es alto | Workflow + human-in-the-loop |
+| Necesita ejecutar código arbitrario | Agente + sandbox |
+
+<Callout type="insight" title="Agentes de código">
+Los agentes de código (Claude Code, Codex, Cursor) son la implementación más madura del bucle agéntico: acceden al sistema de archivos, ejecutan comandos, leen el output, y ajustan el siguiente paso. Combinan el bucle ReAct con sandboxing y human-in-the-loop cuando la acción es destructiva.
+</Callout>

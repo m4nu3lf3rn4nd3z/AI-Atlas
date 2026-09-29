@@ -1,0 +1,110 @@
+La mayoría de sistemas con LLMs no son agentes autónomos: son **flujos de trabajo** donde el LLM ejecuta pasos definidos, no decide qué pasos ejecutar. Esta distinción es fundamental para elegir la arquitectura correcta.
+
+<Callout type="note" title="Terminología">
+"Workflow" (flujo de trabajo): la lógica de orquestación está en el código; el LLM ejecuta pasos. "Agente": el LLM decide qué hacer a continuación. En la práctica, la mayoría de sistemas son workflows con algún paso agéntico.
+</Callout>
+
+## Los 5 patrones fundamentales
+
+### 1. Prompt chaining
+
+Descompone una tarea compleja en pasos secuenciales donde la salida de cada LLM es la entrada del siguiente.
+
+```
+Input → [LLM 1: extrae puntos clave] → [LLM 2: redacta borrador] → [LLM 3: revisa tono] → Output
+```
+
+**Cuándo usarlo**: tareas con etapas claras y ordenadas; cuando el resultado de una etapa mejora la calidad de la siguiente; cuando quieres poder revisar resultados intermedios.
+
+**Gate de calidad**: entre pasos se puede añadir validación programática (`if "ERROR" in output: ...`) que cortocircuita el pipeline si un paso falla.
+
+### 2. Routing
+
+Un primer LLM (o regla) clasifica el input y lo dirige al handler más apropiado.
+
+```
+Input → [Clasificador] → "soporte técnico" → [LLM especializado en soporte]
+                       → "facturación" → [LLM especializado en facturación]
+                       → "otro" → [LLM generalista]
+```
+
+**Cuándo usarlo**: diferentes tipos de input necesitan prompts o modelos distintos; quieres optimizar coste (modelo barato para casos simples, caro para complejos).
+
+### 3. Parallelization
+
+Ejecuta múltiples llamadas LLM en paralelo y agrega los resultados.
+
+**Variante sectioning**: divide el problema en secciones independientes y las procesa en paralelo.
+
+```python
+import asyncio
+
+async def parallel_analysis(document: str) -> dict:
+    tasks = [
+        analyze_section(document, "resumen ejecutivo"),
+        analyze_section(document, "riesgos"),
+        analyze_section(document, "oportunidades"),
+    ]
+    results = await asyncio.gather(*tasks)
+    return aggregate(results)
+```
+
+**Variante voting (self-consistency)**: genera N respuestas independientes y toma la mayoritaria. Mejora la fiabilidad en tareas donde el LLM puede cometer errores en una sola ejecución.
+
+```
+Input → [LLM] × 5 → mayoría de votos → respuesta final
+```
+
+**Cuándo usarlo**: tareas divisibles en partes independientes; cuando la fiabilidad supera al coste.
+
+### 4. Orchestrator-workers
+
+Un LLM orquestador decide dinámicamente qué hacer y delega a workers especializados.
+
+```
+Input → [Orquestador: planifica] → subtarea 1 → [Worker A]
+                                 → subtarea 2 → [Worker B]
+                                 → subtarea 3 → [Worker C]
+      ← [Orquestador: sintetiza] ←────────────────────────
+```
+
+**Cuándo usarlo**: la descomposición de la tarea no puede determinarse de antemano; diferentes subtareas requieren herramientas o conocimiento distintos.
+
+### 5. Evaluator-optimizer
+
+Un LLM genera, otro evalúa, y se itera hasta que la calidad es suficiente.
+
+```
+Input → [Generador] → borrador → [Evaluador] → "mejorar el tono formal"
+       ↑_______________________________________|
+
+       (repetir hasta que el evaluador aprueba o max iteraciones)
+```
+
+**Cuándo usarlo**: criterios de calidad claros que se pueden articular en un prompt; iteración mejora el resultado; tienes ciclos de evaluación bien definidos.
+
+## La regla de Anthropic
+
+> "Usa el sistema más simple posible. Añade complejidad solo cuando la simplicidad no funciona."
+
+La mayoría de casos no necesitan un framework de agentes complejo. Un script Python con llamadas a la API de Claude y algo de estado es a menudo la mejor arquitectura.
+
+## Cuándo pasar a un agente real
+
+Un <Concept id="agent-loop">bucle agéntico</Concept> es correcto cuando:
+- El número de pasos no puede determinarse de antemano
+- La tarea requiere exploración: el agente decide qué herramientas usar según los resultados
+- El dominio requiere backtracking y replanificación
+
+Si el número de pasos es fijo o el flujo es lineal, un workflow es más predecible, más barato y más fácil de depurar.
+
+## Tabla de decisión
+
+| Característica de la tarea | Patrón |
+|---|---|
+| Pasos fijos y ordenados | Prompt chaining |
+| Inputs de tipos distintos | Routing |
+| Partes independientes | Parallelization |
+| Descomposición dinámica | Orchestrator-workers |
+| Criterio de calidad claro | Evaluator-optimizer |
+| Número de pasos desconocido, herramientas dinámicas | Agente (ReAct) |

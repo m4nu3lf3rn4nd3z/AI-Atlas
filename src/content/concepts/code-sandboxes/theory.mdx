@@ -1,0 +1,117 @@
+Los **sandboxes de ejecución de código** son entornos aislados donde los agentes pueden ejecutar código generado por LLMs de forma segura. Son un componente crítico en sistemas agénticos que generan y ejecutan código.
+
+Sin un sandbox, ejecutar código generado por un LLM directamente es un riesgo de seguridad serio: el modelo puede (intencionalmente por injection, o accidentalmente) generar código que daña el sistema host.
+
+## El problema de seguridad
+
+```python
+# ❌ NUNCA hacer esto en producción
+llm_code = client.messages.create(
+    model="claude-opus-5-5",
+    max_tokens=512,
+    messages=[{"role": "user", "content": "Escribe código Python para limpiar archivos temporales"}],
+).content[0].text
+
+exec(llm_code)  # El LLM podría generar: import shutil; shutil.rmtree("/")
+```
+
+El código del LLM debe ejecutarse en un entorno donde:
+- No tenga acceso al sistema de archivos del host
+- No pueda hacer llamadas de red arbitrarias
+- Esté limitado en recursos (CPU, memoria, tiempo)
+- Sus efectos sean contenidos y reversibles
+
+## Opciones de sandbox
+
+### Docker (self-hosted)
+
+La opción más flexible: un contenedor Docker aislado con los permisos mínimos necesarios:
+
+```python
+import docker
+import tempfile
+import os
+
+def execute_in_sandbox(code: str, timeout: int = 10) -> dict:
+    client = docker.from_env()
+    
+    # Escribir el código en un fichero temporal
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
+        f.write(code)
+        code_path = f.name
+    
+    try:
+        # Ejecutar en contenedor aislado
+        result = client.containers.run(
+            image="python:3.12-slim",
+            command=["python", "/code/script.py"],
+            volumes={os.path.dirname(code_path): {"bind": "/code", "mode": "ro"}},
+            # Restricciones de seguridad
+            network_disabled=True,           # Sin acceso a internet
+            read_only=True,                  # Filesystem de solo lectura
+            mem_limit="128m",                # Máximo 128MB de RAM
+            cpu_quota=50000,                 # 50% de un CPU
+            timeout=timeout,                 # Timeout en segundos
+            remove=True,                     # Auto-borrar al terminar
+        )
+        return {"stdout": result.decode("utf-8"), "error": None}
+    except docker.errors.ContainerError as e:
+        return {"stdout": "", "error": str(e)}
+    finally:
+        os.unlink(code_path)
+```
+
+### Servicios gestionados
+
+Para no gestionar la infraestructura de sandbox, existen servicios especializados:
+
+- **E2B** (e2b.dev): sandboxes de código como servicio con SDK Python/TypeScript, acceso a filesystem, internet controlado, y 30s de timeout por defecto
+- **Daytona**: plataformas de desarrollo reproducibles
+- **Modal**: serverless compute con aislamiento
+- **Anthropic Managed Agents**: cuando se usa el <Concept id="agent-loop">bucle agéntico</Concept> gestionado de Anthropic, las herramientas de código corren en un sandbox de Anthropic
+
+```python
+from e2b_code_interpreter import Sandbox
+
+sandbox = Sandbox()
+execution = sandbox.run_code("print(2 + 2)")
+print(execution.text)   # "4"
+sandbox.close()
+```
+
+### Restricciones del intérprete (para casos simples)
+
+Para código simple (expresiones matemáticas, transformaciones de datos), RestrictedPython o `ast.literal_eval` permiten evaluar subconjuntos del lenguaje:
+
+```python
+import ast
+
+def safe_eval(expression: str) -> any:
+    """Evalúa solo literales y expresiones matemáticas básicas."""
+    try:
+        tree = ast.parse(expression, mode="eval")
+        # Verificar que solo contiene nodos seguros
+        for node in ast.walk(tree):
+            if not isinstance(node, (ast.Expression, ast.Constant, ast.BinOp, ast.UnaryOp,
+                                     ast.Add, ast.Sub, ast.Mult, ast.Div, ast.Pow)):
+                raise ValueError(f"Operación no permitida: {type(node).__name__}")
+        return eval(compile(tree, "<string>", "eval"))
+    except Exception as e:
+        return f"Error: {e}"
+
+safe_eval("2 ** 10 + 5 * 3")  # → 1039 ✅
+safe_eval("import os; os.system('rm -rf /')")  # → Error ✅
+```
+
+## Qué debe permitir un sandbox para casos de uso reales
+
+| Caso de uso | Acceso necesario | Acceso a denegar |
+|---|---|---|
+| Análisis de datos (pandas, numpy) | Filesystem de trabajo, librerías científicas | Red, sistema de ficheros del host |
+| Agente de código (dev) | Git, npm/pip, filesystem del proyecto | Acceso a producción, credenciales |
+| Pruebas automáticas | Runner de tests, base de datos de test | Credenciales de producción |
+| Ejecución de scripts LLM | Python básico | Todo lo demás |
+
+<Callout type="note" title="La regla de oro">
+El sandbox no es un guardrail que se activa cuando el código es malo — es el entorno normal de ejecución para TODO el código generado por LLMs. No hay código de LLM tan "seguro" como para ejecutarse sin sandbox en una máquina con datos reales.
+</Callout>

@@ -1,97 +1,130 @@
 import type { ConceptDetails } from '../../schema'
-import ggufInspect from './snippets/gguf_inspect.py?raw'
-import safetensorsHeader from './snippets/safetensors_header.py?raw'
 
 const details: ConceptDetails = {
   reviewedAt: '2026-09',
   snippets: [
     {
-      title: 'Leer la cabecera de un safetensors remoto',
+      title: 'Cargar safetensors con transformers',
       lang: 'python',
-      code: safetensorsHeader,
-      deps: { requests: '>=2.31' },
+      code: `from transformers import AutoTokenizer, AutoModelForCausalLM
+import torch
+
+model_id = "Qwen/Qwen2.5-7B-Instruct"
+
+# Descarga automáticamente safetensors desde Hugging Face Hub
+tokenizer = AutoTokenizer.from_pretrained(model_id)
+model = AutoModelForCausalLM.from_pretrained(
+    model_id,
+    torch_dtype=torch.bfloat16,   # BF16 para GPUs modernas
+    device_map="auto",             # distribuye automáticamente entre GPUs
+)
+
+inputs = tokenizer("El KV cache almacena", return_tensors="pt").to(model.device)
+output = model.generate(**inputs, max_new_tokens=50)
+print(tokenizer.decode(output[0], skip_special_tokens=True))
+`,
+      deps: { transformers: '>=4.45', torch: '>=2.2', accelerate: '>=0.34' },
       verifiedAt: '2026-09',
-      note: 'Descarga unos pocos KB, no los pesos. Es la misma técnica que usa scripts/extract-weights.mjs de esta app.',
+      note: 'Descarga ~15 GB para el 7B en BF16. device_map="auto" gestiona la distribución entre múltiples GPUs automáticamente.',
     },
     {
-      title: 'Inspeccionar un GGUF',
-      lang: 'python',
-      code: ggufInspect,
-      deps: { gguf: '>=0.10' },
+      title: 'Convertir a GGUF con llama.cpp',
+      lang: 'bash',
+      code: `# 1. Clonar llama.cpp
+git clone https://github.com/ggml-org/llama.cpp
+cd llama.cpp && cmake -B build && cmake --build build --config Release -j 8
+
+# 2. Convertir de safetensors a GGUF (F16)
+python convert_hf_to_gguf.py /ruta/al/modelo --outfile modelo-f16.gguf --outtype f16
+
+# 3. Cuantizar a Q4_K_M (balance calidad/tamaño)
+./build/bin/llama-quantize modelo-f16.gguf modelo-Q4_K_M.gguf Q4_K_M
+
+# 4. Verificar el resultado
+./build/bin/llama-cli -m modelo-Q4_K_M.gguf -p "Hola" -n 50
+`,
+      deps: { 'llama.cpp': 'build (2026)' },
       verifiedAt: '2026-09',
+      note: 'La mayoría de usuarios descarga GGUF ya convertido desde Hugging Face. Solo necesitas este proceso para modelos que no tienen versión GGUF disponible.',
     },
   ],
   quiz: [
     {
-      q: 'Descargas un modelo de un repositorio desconocido que solo ofrece `pytorch_model.bin`. ¿Qué riesgo corres al cargarlo?',
+      q: 'Ves un fichero llamado "Llama-3.3-70B-Q4_K_M.gguf". ¿Qué información te da el nombre?',
       options: [
-        'Ninguno: son solo números.',
-        'Que tarde más en cargar.',
-        'Que ocupe más memoria.',
-        'Que ejecute código arbitrario al deserializarse, porque el formato pickle lo permite.',
-      ],
-      answer: 3,
-      explain: 'Pickle puede incluir instrucciones que se ejecutan al cargar. safetensors solo contiene datos. Prefiere safetensors y fuentes de confianza.',
-    },
-    {
-      q: '¿Qué formato usarías para ejecutar un modelo con Ollama o llama.cpp?',
-      options: ['GGUF', 'ONNX', 'Un motor de TensorRT', 'safetensors en FP8'],
-      answer: 0,
-      explain: 'GGUF es el formato de llama.cpp, y Ollama y LM Studio lo usan. Incluye pesos, tokenizador, plantilla y metadatos en un solo fichero.',
-    },
-    {
-      q: 'Un modelo instruct responde de forma incoherente en tu runtime, sin errores. ¿Qué es lo primero que comprobarías?',
-      options: [
-        'La velocidad del disco.',
-        'Que la conversación se envía con la plantilla de chat del modelo.',
-        'El número de GPUs.',
-        'La versión de CUDA.',
+        'Es un modelo de 4B parámetros.',
+        'Es el modelo Llama 3.3 de 70B parámetros, en formato GGUF, cuantizado a ~4,9 bits con el método K_M de llama.cpp.',
+        'El modelo usa Q4 bits de activaciones.',
+        'K_M es el proveedor del modelo.',
       ],
       answer: 1,
-      explain: 'Con una plantilla distinta de la del entrenamiento, el modelo recibe los turnos en un formato que no conoce. No falla: responde peor.',
+      explain:
+        'El nombre del fichero GGUF codifica: nombre del modelo (Llama-3.3-70B), formato (GGUF implícito), y cuantización (Q4_K_M = ~4,9 bits por peso con escala por grupos de tipo K, variante medium).',
     },
     {
-      q: '¿Para qué sirve generation_config.json?',
+      q: '¿Por qué safetensors es más seguro que los ficheros .pt (pickle) de PyTorch?',
       options: [
-        'Para definir la arquitectura del modelo.',
-        'Para guardar los pesos cuantizados.',
-        'Para indicar los parámetros de generación recomendados por el autor, como la temperatura o top-p.',
-        'Para la licencia.',
+        'Porque está cifrado.',
+        'Porque es más pequeño.',
+        'Porque no ejecuta código Python arbitrario al deserializar, a diferencia de los pickles.',
+        'Porque usa compresión.',
       ],
       answer: 2,
-      explain: 'Por ejemplo, Qwen2.5 publica temperatura 0,7, top-p 0,8 y top-k 20. El lab de sampling lo usa como preset.',
+      explain:
+        'Los ficheros pickle ejecutan código Python al deserializarse. Un fichero .pt malicioso puede ejecutar código arbitrario en tu máquina al cargarlo. safetensors solo contiene datos de tensores y metadatos JSON, sin ejecución de código.',
+    },
+    {
+      q: '¿Cuál es el formato más adecuado para correr un modelo de 7B en un Mac con Apple Silicon M3?',
+      options: [
+        'safetensors en CUDA.',
+        'GGUF con Ollama o GPTQ.',
+        'MLX (Apple Silicon framework) o GGUF vía Ollama/llama.cpp.',
+        'ONNX con Python.',
+      ],
+      answer: 2,
+      explain:
+        'Apple Silicon tiene memoria unificada que comparte CPU/GPU. MLX está optimizado para ello. Ollama también usa llama.cpp con Metal y funciona bien. No soporta CUDA (es tecnología NVIDIA).',
+    },
+    {
+      q: '¿Cuál es la diferencia entre AWQ y GPTQ?',
+      options: [
+        'AWQ es más nuevo y GPTQ está obsoleto.',
+        'AWQ protege pesos sensibles según las activaciones; GPTQ minimiza el error cuantizando columna a columna. Ambos usan calibración y son superiores al redondeo simple.',
+        'AWQ es para GPU y GPTQ para CPU.',
+        'No hay diferencia práctica.',
+      ],
+      answer: 1,
+      explain:
+        'Ambos son métodos de cuantización post-entrenamiento de alta calidad. AWQ identifica y protege los canales más importantes para las activaciones. GPTQ minimiza el error cuantizando columna a columna con datos de calibración. Ambos producen mejores resultados que el redondeo simple (RTN).',
     },
   ],
   misconceptions: [
     {
-      myth: 'GGUF y cuantización son lo mismo.',
-      reality: 'GGUF es el contenedor; la cuantización es el tipo numérico de los tensores que lleva dentro. Un GGUF puede estar en BF16.',
+      myth: 'GGUF es un tipo de cuantización.',
+      reality:
+        'GGUF es un formato de fichero de llama.cpp que puede contener pesos en cualquier precisión: F16, Q8_0, Q4_K_M, etc. La cuantización es el tipo numérico de los pesos que van dentro del fichero.',
     },
     {
-      myth: 'Un modelo de Hugging Face es seguro porque está en Hugging Face.',
-      reality: 'El Hub escanea ficheros pickle y avisa, pero cualquiera puede subir modelos. Revisa el autor, el formato y fija la versión.',
+      myth: 'Solo puedo usar un modelo si está en el formato de mi runtime favorito.',
+      reality:
+        'La mayoría de modelos populares tienen versiones en múltiples formatos en Hugging Face Hub. Si no existe la versión que necesitas, puedes convertir tú mismo con las herramientas de llama.cpp, transformers o mlx-lm.',
     },
   ],
   sources: [
     {
-      title: 'Hugging Face · Safetensors',
-      url: 'https://huggingface.co/docs/safetensors/index',
+      title: 'Hugging Face · safetensors documentation',
+      url: 'https://huggingface.co/docs/safetensors/',
       kind: 'docs',
     },
     {
-      title: 'Hugging Face Hub · Pickle scanning',
-      url: 'https://huggingface.co/docs/hub/security-pickle',
+      title: 'llama.cpp · GGUF format specification',
+      url: 'https://github.com/ggml-org/llama.cpp/blob/master/docs/gguf.md',
       kind: 'docs',
     },
     {
-      title: 'GGUF · especificación del formato',
-      url: 'https://github.com/ggml-org/ggml/blob/master/docs/gguf.md',
-      kind: 'repo',
-    },
-    {
-      title: 'ONNX · Open Neural Network Exchange',
-      url: 'https://onnx.ai',
-      kind: 'docs',
+      title: 'Lin et al. (2023) · AWQ: Activation-aware Weight Quantization',
+      url: 'https://arxiv.org/abs/2306.00978',
+      kind: 'paper',
     },
   ],
 }

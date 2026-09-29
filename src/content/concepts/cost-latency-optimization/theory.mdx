@@ -1,0 +1,145 @@
+Optimizar coste y latencia en sistemas LLM es un ejercicio continuo: los modelos cambian, los precios bajan y los casos de uso evolucionan. El punto de partida es siempre **medir primero**.
+
+Los dos objetivos (coste y latencia) están relacionados pero no son lo mismo:
+- El coste depende principalmente del número de tokens
+- La latencia depende de la longitud de la respuesta, el tamaño del modelo y la carga del proveedor
+
+## Las métricas clave
+
+```
+TTFT (Time To First Token) — lo que percibe el usuario como "rapidez de inicio"
+TPOT (Time Per Output Token) — velocidad durante el streaming
+TTL (Time To Last Token) — latencia total de la respuesta
+Throughput — tokens/segundo (relevante para procesamiento batch)
+
+Coste = (input_tokens / 1M) × precio_input + (output_tokens / 1M) × precio_output
+```
+
+## Levers de coste (ordenados de menor a mayor esfuerzo)
+
+### 1. Prompt caching (coste -80% en el contexto cacheado)
+
+Si envías un system prompt largo o documentos en cada request, el proveedor lo puede cachear:
+
+```python
+client.messages.create(
+    model="claude-opus-5-5",
+    system=[
+        {
+            "type": "text",
+            "text": system_prompt_muy_largo,  # este texto se cachea
+            "cache_control": {"type": "ephemeral"},
+        }
+    ],
+    messages=conversation,
+)
+```
+
+Anthropic cobra los tokens cacheados a ~10% del precio normal. Para un system prompt de 5.000 tokens que se reutiliza en 1.000 llamadas, el ahorro es sustancial.
+
+### 2. Modelo correcto para cada tarea (coste -60-80%)
+
+Usar Claude Opus donde Haiku es suficiente es el error más caro:
+
+```python
+def pick_model(task: str) -> str:
+    if "clasificar" in task or "extraer" in task:
+        return "claude-haiku-4-5-20251001"  # 20x más barato que Opus
+    if "razonar" in task or "código complejo" in task:
+        return "claude-opus-5-5"
+    return "claude-sonnet-5-5"  # buen default
+```
+
+### 3. Reducir tokens de input (coste -20-40%)
+
+- Eliminar relleno del system prompt (instrucciones redundantes, ejemplos innecesarios)
+- Truncar conversaciones largas: en lugar de enviar toda la historia, resumirla
+- Usar few-shot solo cuando mejora la calidad, no por defecto
+- En RAG, solo los chunks más relevantes (no los top-20, sino los top-3 que superan un umbral)
+
+```python
+# Mal: enviar todo
+messages = full_conversation_history  # 50 mensajes
+
+# Bien: comprimir el contexto
+messages = [
+    {"role": "user", "content": f"Resumen de conversación:\n{summary}"},
+    *recent_messages[-4:],  # solo los últimos mensajes
+]
+```
+
+### 4. Reducir tokens de output (coste -15-30%)
+
+Los tokens de output cuestan ~3-5x más que los de input:
+
+- Pedir respuestas concisas ("responde en máximo 2 párrafos")
+- Structured outputs en JSON en lugar de texto con explicaciones largas
+- Evitar pedirle al modelo que "explique su razonamiento" si no lo necesitas
+
+```python
+# Caro: pide explicación
+"Analiza este contrato y explica cada cláusula en detalle"
+
+# Barato: pide solo el resultado
+"Analiza este contrato. Responde en JSON: {risk_level, key_issues: [string], recommendation}"
+```
+
+### 5. Batch API para procesamiento no urgente (coste -50%)
+
+Anthropic, OpenAI y otros ofrecen APIs de batch con descuento (~50%) para requests que pueden procesarse con retraso:
+
+```python
+# Procesar 1.000 documentos sin necesidad de resultado inmediato
+batch = client.beta.messages.batches.create(
+    requests=[
+        {"custom_id": f"doc-{i}", "params": {"model": "claude-opus-5-5", "max_tokens": 512, "messages": [...]}}
+        for i, doc in enumerate(documents)
+    ]
+)
+# El batch se procesa en las próximas 24h a ~50% del precio
+```
+
+## Levers de latencia
+
+### Streaming
+
+Empieza a mostrar la respuesta al usuario con el primer token:
+
+```python
+with client.messages.stream(model="claude-sonnet-5-5", ...) as stream:
+    for text in stream.text_stream:
+        print(text, end="", flush=True)
+```
+
+El TTFT no cambia, pero la experiencia del usuario mejora drásticamente.
+
+### Speculative decoding (infraestructura)
+
+Un modelo pequeño propone tokens candidatos; el modelo grande los verifica en paralelo. El throughput puede mejorar 2-3x sin degradación de calidad. Esta optimización la gestiona el proveedor (vLLM, etc.), no el usuario.
+
+### Paralelizar llamadas independientes
+
+En lugar de llamadas secuenciales, ejecutar en paralelo lo que no tiene dependencias:
+
+```python
+# Mal: secuencial (suma de latencias)
+result_a = call_llm(task_a)  # 2s
+result_b = call_llm(task_b)  # 2s — total: 4s
+
+# Bien: paralelo (máximo de latencias)
+result_a, result_b = await asyncio.gather(call_llm(task_a), call_llm(task_b))  # total: ~2s
+```
+
+## El framework de optimización
+
+```
+1. Medir: ¿cuánto cuesta cada feature? ¿cuáles son los p50/p95/p99 de latencia?
+2. Identificar: ¿dónde está el gasto/latencia mayor?
+3. Aplicar el lever de menor esfuerzo primero (caching, modelo correcto)
+4. Medir de nuevo: ¿cuánto mejoró? ¿afectó a la calidad?
+5. Repetir hasta alcanzar el objetivo
+```
+
+<Callout type="tradeoff" title="Nunca sacrifiques calidad sin medirla">
+Reducir coste cambiando a un modelo más pequeño puede degradar la calidad. Siempre ejecuta las evals antes y después del cambio. Un sistema 50% más barato pero con respuestas peores puede costar más en abandono de usuarios.
+</Callout>

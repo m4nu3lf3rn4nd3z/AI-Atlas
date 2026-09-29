@@ -1,0 +1,107 @@
+**Agent-to-Agent (A2A)** es un protocolo abierto, propuesto por Google en 2025, para que agentes de IA se comuniquen entre sí como servicios web, independientemente del framework que los implemente.
+
+Donde <Concept id="mcp">MCP</Concept> conecta un agente con herramientas y recursos, A2A conecta **agentes entre sí** para delegar tareas completas.
+
+## El problema que resuelve
+
+En un sistema multi-agente sin estándares, cada integración es ad-hoc:
+
+```
+# Sin A2A: cada agente habla su propio protocolo
+Agent-A llama a Agent-B vía función Python propia
+Agent-B llama a Agent-C vía REST endpoint custom
+Agent-C no puede delegar a Agent-D de otro framework
+```
+
+Con A2A, cualquier agente puede delegar a cualquier otro si ambos hablan el protocolo:
+
+```
+Agent-A (LangGraph) → A2A → Agent-B (CrewAI)
+Agent-B (CrewAI) → A2A → Agent-C (AutoGen)
+```
+
+## Cómo funciona
+
+### Agent Card
+
+Cada agente publica un **Agent Card** en `.well-known/agent.json`: un descriptor JSON que anuncia sus capacidades:
+
+```json
+{
+  "name": "research-agent",
+  "description": "Agente especializado en investigación web y síntesis de información",
+  "url": "https://my-agent.example.com",
+  "capabilities": {
+    "streaming": true,
+    "pushNotifications": false
+  },
+  "skills": [
+    {
+      "id": "research",
+      "name": "Web Research",
+      "description": "Busca y sintetiza información de la web sobre un tema",
+      "inputModes": ["text"],
+      "outputModes": ["text"]
+    }
+  ]
+}
+```
+
+### Task lifecycle
+
+Un cliente (otro agente o aplicación) delega una tarea:
+
+```
+POST /tasks
+{
+  "id": "task-xyz",
+  "message": {
+    "role": "user",
+    "parts": [{"type": "text", "text": "Investiga los últimos avances en modelos de razonamiento"}]
+  }
+}
+```
+
+La tarea pasa por estados: `submitted` → `working` → `completed` (o `failed`, `cancelled`).
+
+### Streaming con Server-Sent Events
+
+Para tareas largas, el servidor puede enviar actualizaciones incrementales:
+
+```
+data: {"type": "task_status", "taskId": "task-xyz", "status": "working", "progress": 0.3}
+data: {"type": "artifact", "taskId": "task-xyz", "artifact": {"type": "text", "text": "Encontré 15 artículos relevantes..."}}
+data: {"type": "task_status", "taskId": "task-xyz", "status": "completed"}
+```
+
+## A2A vs MCP: complementarios
+
+| | MCP | A2A |
+|---|---|---|
+| Conecta | Agente ↔ Herramientas/Recursos | Agente ↔ Agente |
+| Abstracción | Herramientas (funciones) | Tasks (trabajo delegado) |
+| Estado | Sin estado (cada llamada es independiente) | Con estado (la tarea tiene lifecycle) |
+| Comunicación | JSON-RPC 2.0 | HTTP/REST + SSE |
+| Analogía | Un agente llama a una API | Un agente contrata a otro agente |
+
+En la práctica, un sistema multi-agente puede usar MCP para conectar cada agente con sus herramientas, y A2A para que los agentes se deleguen trabajo entre sí.
+
+## Escenario de ejemplo
+
+```
+Usuario → Agente-Orquestador
+  ↓ A2A
+Agente-Investigador (busca y sintetiza información)
+  ↓ A2A
+Agente-Redactor (redacta el borrador)
+  ↓ A2A
+Agente-Revisor (revisa el borrador y propone mejoras)
+  ↑
+Agente-Orquestador recibe resultado final
+```
+
+Cada agente puede estar implementado con un framework diferente, en diferentes servidores, por diferentes equipos.
+
+<Callout type="note" title="Estado del protocolo (sep 2026)">
+A2A fue anunciado por Google en abril 2025 con soporte inicial de Atlassian, Cohere, Salesforce y otros. El ecosistema sigue madurando. Para sistemas en producción en 2026, verifica la compatibilidad de tu framework específico.
+</Callout>

@@ -1,0 +1,120 @@
+Evaluar si una respuesta LLM es buena es difícil: no hay una respuesta "correcta" única, el dominio puede ser especializado, y revisar miles de respuestas manualmente es inviable. **LLM-as-judge** usa otro modelo de lenguaje como evaluador automático.
+
+Es la pieza central de los sistemas de <Concept id="evals">evaluación</Concept> modernos: sin un juez automatizado, las evals no escalan.
+
+## La intuición básica
+
+En lugar de comparar una respuesta con una respuesta de referencia (que requiere escribir las respuestas correctas manualmente), le preguntas a un LLM si la respuesta cumple los criterios:
+
+```python
+JUDGE_PROMPT = """Evalúa esta respuesta según la rúbrica:
+- ¿Es factualmente correcta?
+- ¿Responde directamente la pregunta?
+- ¿Es concisa (sin relleno)?
+
+Pregunta: {question}
+Respuesta: {answer}
+
+Responde: {"score": 1-5, "reasons": ["..."], "verdict": "pass"|"fail"}"""
+```
+
+## Formatos de juicio
+
+### Absolute scoring (puntuación absoluta)
+
+El juez asigna una puntuación del 1 al 5 (o 0/1) directamente:
+
+```
+Puntuación: 4/5
+Razón: Correcta y concisa, pero omite mencionar la excepción del caso edge.
+```
+
+Ventaja: simple. Desventaja: los jueces LLM tienden a dar puntuaciones altas por defecto (positivity bias).
+
+### Pairwise comparison (comparación por pares)
+
+El juez ve dos respuestas y elige la mejor (estilo Elo/arena):
+
+```
+Respuesta A vs Respuesta B: ¿Cuál es mejor?
+→ "A es más precisa; B es más larga pero no añade información relevante"
+→ Ganadora: A
+```
+
+Ventaja: más fiable que la puntuación absoluta (relativiza el juicio). Usado en plataformas como LMSYS Chatbot Arena.
+
+### Reference-guided
+
+El juez recibe una respuesta de referencia y evalúa cuánto se acerca la respuesta generada:
+
+```
+Respuesta de referencia: "El KV cache almacena las claves y valores de atención calculados en tokens previos."
+Respuesta generada: "El KV cache guarda resultados intermedios para no recalcularlos."
+Evaluación: 3/5 — captura la idea pero omite el mecanismo específico (claves/valores de atención).
+```
+
+Ventaja: más objetivo. Desventaja: requiere tener respuestas de referencia escritas.
+
+## Sesgos conocidos del juez LLM
+
+| Sesgo | Descripción | Mitigación |
+|---|---|---|
+| **Verbosity bias** | Prefiere respuestas más largas, asumiendo que más detalle = mejor calidad | Incluir en la rúbrica "penalizar el relleno" |
+| **Self-enhancement bias** | GPT prefiere respuestas de GPT; Claude prefiere las suyas | Usar jueces de distinto proveedor que el sistema |
+| **Positivity bias** | Tiende a dar puntuaciones altas por defecto | Usar comparación por pares en lugar de scoring absoluto |
+| **Recency bias** | En comparaciones, prefiere la segunda respuesta | Randomizar el orden y promediar |
+| **Sycophancy** | Cambia su juicio si le dices que la respuesta fue de un experto | No incluir metadatos del autor en el prompt del juez |
+
+<Callout type="tradeoff" title="¿Qué modelo usar como juez?">
+Los mejores jueces son los modelos más capaces (Claude Opus, GPT-4o, Gemini Ultra) — tienen mejor comprensión y son más consistentes. Pero cuestan más. Para evals a escala, un modelo mediano con una rúbrica muy precisa puede ser suficiente. Nunca uses el mismo modelo que el sistema que estás evaluando.
+</Callout>
+
+## Calibración: validar que el juez funciona
+
+Antes de confiar en un juez LLM en producción, hay que calibrarlo:
+
+1. **Crear un golden dataset**: ~100 ejemplos anotados por humanos (con puntuaciones)
+2. **Correlación**: comparar las puntuaciones del juez con las humanas (>0.8 es aceptable)
+3. **Casos extremos**: asegurarse de que el juez detecta respuestas claramente malas
+
+```python
+from scipy.stats import spearmanr
+
+human_scores = [4, 2, 5, 1, 3, 4, ...]   # anotaciones humanas
+judge_scores = [4, 3, 5, 2, 3, 4, ...]   # juez LLM
+
+correlation, p_value = spearmanr(human_scores, judge_scores)
+print(f"Correlación Spearman: {correlation:.3f}")  # objetivo: > 0.8
+```
+
+## Rúbricas: la clave del éxito
+
+Un juez sin rúbrica clara produce resultados inconsistentes. La rúbrica debe:
+
+- Definir qué significa cada puntuación (no "1=malo, 5=bueno" sino descripciones concretas)
+- Ser específica al dominio ("¿Cita las fuentes normativas correctas?")
+- Incluir ejemplos de respuestas de referencia para cada nivel
+
+```python
+RUBRIC = """
+5/5: Respuesta directa, factualmente correcta, sin relleno, con ejemplos relevantes.
+4/5: Correcta y concisa, pero omite un caso edge relevante.
+3/5: Correcta en lo esencial pero vaga o con imprecisiones menores.
+2/5: Parcialmente correcta, con un error factual claro.
+1/5: Incorrecta, engañosa o sin relación con la pregunta.
+"""
+```
+
+## LLM-as-judge en el pipeline de CI
+
+```python
+# En el CI/CD: bloquear deployment si el score cae
+def eval_gate(system: Callable, dataset: list[EvalCase], threshold: float = 0.75) -> bool:
+    results = run_eval(system, dataset)
+    avg_score = sum(r.score for r in results) / len(results)
+    if avg_score < threshold:
+        raise ValueError(f"Eval falló: score {avg_score:.2f} < umbral {threshold}")
+    return True
+```
+
+Esto permite hacer **regressions testing automático**: cada cambio en el prompt o en el modelo se evalúa antes de llegar a producción.

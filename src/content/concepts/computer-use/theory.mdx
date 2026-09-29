@@ -1,0 +1,112 @@
+**Computer use** es la capacidad de un modelo de IA de controlar directamente un ordenador: mover el cursor, hacer clic, escribir texto, tomar capturas de pantalla y ejecutar comandos. El modelo interactúa con el ordenador igual que lo haría un humano.
+
+Es una de las capacidades más poderosas y más peligrosas de los sistemas agénticos.
+
+## Cómo funciona
+
+El ciclo es:
+1. El agente toma una **captura de pantalla** del estado actual del escritorio o navegador
+2. El modelo analiza la imagen y decide la siguiente acción
+3. La acción se ejecuta (clic, escritura, scroll, tecla)
+4. Se toma otra captura de pantalla y se repite
+
+```python
+import anthropic
+
+client = anthropic.Anthropic()
+
+# Herramientas disponibles para computer use
+tools = [
+    {
+        "type": "computer_20241022",
+        "name": "computer",
+        "display_width_px": 1920,
+        "display_height_px": 1080,
+        "display_number": 1,
+    }
+]
+
+response = client.messages.create(
+    model="claude-opus-5-5",
+    max_tokens=1024,
+    tools=tools,
+    messages=[
+        {"role": "user", "content": "Abre el navegador, ve a google.com y busca 'LLM inference optimization'"}
+    ],
+)
+```
+
+El modelo responde con bloques `tool_use` que indican las acciones a tomar:
+```json
+{
+  "type": "tool_use",
+  "name": "computer",
+  "input": {
+    "action": "left_click",
+    "coordinate": [760, 540]
+  }
+}
+```
+
+Tu código ejecuta la acción, toma una captura de pantalla, y la envía de vuelta como `tool_result`.
+
+## Casos de uso reales
+
+- **Automatización de UI legada**: sistemas que no tienen API pero sí interfaz gráfica
+- **Testing de UX**: verificar que una interfaz funciona como se espera
+- **Extracción de datos de sistemas cerrados**: copiar datos de una aplicación desktop
+- **Asistente de productividad**: ejecutar flujos de trabajo en aplicaciones existentes
+- **QA automatizado**: probar aplicaciones web con un agente que "piensa como un humano"
+
+## Los riesgos específicos
+
+<Callout type="tradeoff" title="Computer use tiene una superficie de ataque enorme">
+El agente tiene acceso a todo lo que puede ver en pantalla y todo lo que puede hacer con el ratón y teclado. Las consecuencias de un error o de una prompt injection son potencialmente muy grandes: borrar archivos, enviar emails, hacer compras, etc.
+</Callout>
+
+| Riesgo | Mitigación |
+|---|---|
+| Acción en el sistema equivocado | Sandboxing en VM o contenedor aislado |
+| Prompt injection en páginas web | El contenido de las páginas puede contener instrucciones para el agente |
+| Acciones irreversibles (borrar, enviar) | Confirmación humana antes de acciones de alto impacto |
+| Acceso a datos sensibles en pantalla | Permisos de pantalla selectivos; no ejecutar con cuentas administrativas |
+| Loop infinito | Límites de pasos; timeout |
+
+## Mejores prácticas
+
+### Siempre en un entorno aislado
+
+```bash
+# Docker con display virtual (Xvfb)
+docker run --rm \
+  -e DISPLAY=:99 \
+  -v /tmp/.X11-unix:/tmp/.X11-unix \
+  ubuntu-desktop-agent:latest
+```
+
+Nunca ejecutar computer use en la máquina de producción o con cuentas que tengan acceso a datos críticos.
+
+### Confirmación humana para acciones irreversibles
+
+```python
+def execute_computer_action(action: dict) -> dict:
+    HIGH_RISK_ACTIONS = ["left_click", "double_click"]  # depende del contexto
+    
+    # Si el contexto es un botón "Enviar" o "Eliminar", pedir confirmación
+    if needs_confirmation(action):
+        confirmed = input(f"¿Confirmar acción '{action}'? (s/N): ")
+        if confirmed.lower() != "s":
+            return {"error": "Acción cancelada"}
+    
+    return perform_action(action)
+```
+
+### Scope mínimo
+
+- Ejecutar solo con acceso al área mínima necesaria
+- No dar acceso al gestor de contraseñas, email o datos financieros salvo que sea el objetivo explícito
+- Separar el agente de computer use del resto del sistema con permisos mínimos
+
+## Estado del arte (septiembre 2026)
+
+Los modelos con capacidades de computer use más robustas son Claude Sonnet/Opus (Anthropic) y GPT-4o con vision (OpenAI). Estas capacidades todavía tienen tasas de error no triviales en tareas complejas de múltiples pasos — adecuado para prototipos y casos de uso con supervisión humana, más precaución para sistemas totalmente autónomos en entornos de producción no sandboxeados.
