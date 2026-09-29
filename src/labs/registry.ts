@@ -30,11 +30,12 @@ export const LABS: readonly LabInfo[] = [
   {
     id: 'sampling',
     title: 'Sampling',
-    short: 'Temperature, top-k, top-p y min-p sobre la distribución real del siguiente token.',
+    short: 'Temperature, top-k, top-p y min-p sobre la distribución real del siguiente token, paso a paso.',
     concept: 'sampling',
-    reality: 'mixed',
-    realityNote: 'Matemática real sobre distribuciones capturadas de un modelo real.',
+    reality: 'real',
+    realityNote: 'Distribuciones reales capturadas de Qwen2.5-0.5B-Instruct (4 bits) sobre su vocabulario completo; el muestreo se calcula en tu navegador.',
     phase: 2,
+    Component: lazy(() => import('./sampling/SamplingLab')),
   },
   {
     id: 'embeddings',
