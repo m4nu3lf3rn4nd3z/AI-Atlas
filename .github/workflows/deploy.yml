@@ -39,7 +39,7 @@ jobs:
         env:
           # Sets Vite base to /ai-atlas/ so all asset paths are correct under
           # the GitHub Pages project URL: https://m4nu3lf3rn4nd3z.github.io/ai-atlas/
-          VITE_BASE_URL: /ai-atlas/
+          VITE_BASE_URL: /AI-Atlas/
 
       - uses: actions/upload-pages-artifact@v3
         with:
