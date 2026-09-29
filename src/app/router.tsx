@@ -20,27 +20,31 @@ const ProgressPage = lazy(() => import('@/features/progress/ProgressPage'))
 const NotFound = lazy(() => import('./NotFound'))
 
 /* The URL is the source of truth for what is selected:
-   /map?c=<concept>&tab=<tab>  ·  /c/<concept>/<tab>  ·  /labs/<lab> */
-export const router = createBrowserRouter([
-  {
-    element: <AppShell />,
-    errorElement: <RouteError />,
-    children: [
-      { index: true, element: <HomePage /> },
-      { path: 'map', element: <MapPage /> },
-      { path: 'c/:id/:tab?', element: <ConceptPage /> },
-      { path: 'labs', element: <LabsPage /> },
-      { path: 'labs/:labId', element: <LabPage /> },
-      { path: 'paths', element: <PathsPage /> },
-      { path: 'paths/:pathId', element: <PathPage /> },
-      { path: 'journey', element: <JourneyPage /> },
-      { path: 'cases', element: <CasesPage /> },
-      { path: 'cases/:caseId', element: <CasePage /> },
-      { path: 'tools', element: <ToolsPage /> },
-      { path: 'security', element: <SecurityPage /> },
-      { path: 'glossary', element: <GlossaryPage /> },
-      { path: 'progress', element: <ProgressPage /> },
-      { path: '*', element: <NotFound /> },
-    ],
-  },
-])
+   /map?c=<concept>&tab=<tab>  ·  /c/<concept>/<tab>  ·  /labs/<lab>
+   BASE_URL = Vite 'base' option: '/ai-atlas/' on GitHub Pages, '/' in dev */
+export const router = createBrowserRouter(
+  [
+    {
+      element: <AppShell />,
+      errorElement: <RouteError />,
+      children: [
+        { index: true, element: <HomePage /> },
+        { path: 'map', element: <MapPage /> },
+        { path: 'c/:id/:tab?', element: <ConceptPage /> },
+        { path: 'labs', element: <LabsPage /> },
+        { path: 'labs/:labId', element: <LabPage /> },
+        { path: 'paths', element: <PathsPage /> },
+        { path: 'paths/:pathId', element: <PathPage /> },
+        { path: 'journey', element: <JourneyPage /> },
+        { path: 'cases', element: <CasesPage /> },
+        { path: 'cases/:caseId', element: <CasePage /> },
+        { path: 'tools', element: <ToolsPage /> },
+        { path: 'security', element: <SecurityPage /> },
+        { path: 'glossary', element: <GlossaryPage /> },
+        { path: 'progress', element: <ProgressPage /> },
+        { path: '*', element: <NotFound /> },
+      ],
+    },
+  ],
+  { basename: import.meta.env.BASE_URL },
+)

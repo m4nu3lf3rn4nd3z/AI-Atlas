@@ -7,6 +7,8 @@ import remarkGfm from 'remark-gfm'
 import { defineConfig } from 'vite'
 
 export default defineConfig({
+  // En GitHub Pages el sitio vive en /ai-atlas/; en dev corre en /
+  base: process.env.VITE_BASE_URL ?? '/',
   plugins: [
     {
       enforce: 'pre',
