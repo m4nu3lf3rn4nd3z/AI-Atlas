@@ -39,11 +39,12 @@ export const LABS: readonly LabInfo[] = [
   {
     id: 'embeddings',
     title: 'Espacio de embeddings',
-    short: 'Convierte frases en vectores, proyéctalas en 2D y mide su similitud.',
+    short: 'Mira dónde cae cada frase en el espacio de significados, compara similitudes y busca por sentido frente a por palabras.',
     concept: 'embeddings',
     reality: 'real',
-    realityNote: 'Modelo de embeddings real ejecutándose en tu navegador.',
+    realityNote: 'Vectores reales de multilingual-e5-small; el modelo puede descargarse y ejecutarse en tu navegador.',
     phase: 2,
+    Component: lazy(() => import('./embeddings/EmbeddingsLab')),
   },
   {
     id: 'chunking',

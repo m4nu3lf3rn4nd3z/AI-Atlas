@@ -32,6 +32,12 @@ export default defineConfig({
     // load on demand in the tokenizer views.
     chunkSizeWarningLimit: 2100,
   },
+  // Workers import transformers.js as an ES module.
+  worker: { format: 'es' },
+  optimizeDeps: {
+    // transformers.js resolves its WASM runtime at run time; pre-bundling breaks that.
+    exclude: ['@huggingface/transformers'],
+  },
   test: {
     environment: 'node',
     include: ['src/**/*.test.ts'],
