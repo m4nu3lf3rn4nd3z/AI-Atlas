@@ -15,6 +15,8 @@ const CasesPage = lazy(() => import('@/features/cases/CasesPage'))
 const CasePage = lazy(() => import('@/features/cases/CasePage'))
 const ToolsPage = lazy(() => import('@/features/tools/ToolsPage'))
 const SecurityPage = lazy(() => import('@/features/security/SecurityPage'))
+const ArchitecturesPage = lazy(() => import('@/features/architectures/ArchitecturesPage'))
+const ArchitecturePage = lazy(() => import('@/features/architectures/ArchitecturePage'))
 const GlossaryPage = lazy(() => import('@/features/glossary/GlossaryPage'))
 const ProgressPage = lazy(() => import('@/features/progress/ProgressPage'))
 const NotFound = lazy(() => import('./NotFound'))
@@ -38,6 +40,8 @@ export const router = createBrowserRouter(
         { path: 'cases/:caseId', element: <CasePage /> },
         { path: 'tools', element: <ToolsPage /> },
         { path: 'security', element: <SecurityPage /> },
+        { path: 'architectures', element: <ArchitecturesPage /> },
+        { path: 'architectures/:archId', element: <ArchitecturePage /> },
         { path: 'glossary', element: <GlossaryPage /> },
         { path: 'progress', element: <ProgressPage /> },
         { path: '*', element: <NotFound /> },

@@ -1,4 +1,4 @@
-import { ArrowRight, Briefcase, FlaskConical, Network, Route, ShieldAlert, Sparkles } from 'lucide-react'
+import { ArrowRight, Briefcase, FlaskConical, LayoutTemplate, Network, Route, Sparkles } from 'lucide-react'
 import type { CSSProperties } from 'react'
 import { Link } from 'react-router'
 import { Button } from '@/components/ui/button'
@@ -8,6 +8,7 @@ import { LAYERS } from '@/content/layers'
 import { CASES } from '@/cases'
 import { TOOLS } from '@/content/tools'
 import { LABS } from '@/labs/registry'
+import { ARCHITECTURES } from '@/features/architectures/arch-data'
 import { useProgress } from '@/stores/progress'
 import { recommendNext } from '../progress/recommend'
 import { PROGRESS_STYLE, progressState } from '../progress/status'
@@ -23,31 +24,15 @@ export default function HomePage() {
     <div className="relative">
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-0 h-[420px] opacity-70"
+        className="pointer-events-none absolute inset-x-0 top-0 h-[500px] opacity-60"
         style={{
           background:
-            'radial-gradient(600px 260px at 20% 0%, color-mix(in oklab, var(--l0) 16%, transparent), transparent), radial-gradient(500px 240px at 85% 10%, color-mix(in oklab, var(--l2) 12%, transparent), transparent)',
+            'radial-gradient(700px 300px at 15% 0%, color-mix(in oklab, var(--l0) 14%, transparent), transparent), radial-gradient(500px 280px at 90% 5%, color-mix(in oklab, var(--l2) 10%, transparent), transparent)',
         }}
       />
-      <div className="relative mx-auto max-w-6xl px-5 pt-8 pb-20 sm:px-8">
-        <Link
-          to="/security"
-          className="group mb-10 flex items-center gap-4 rounded-2xl border border-bad/35 bg-bad/5 px-5 py-4 transition-colors hover:border-bad/60"
-        >
-          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-bad/10 text-bad">
-            <ShieldAlert className="size-5" />
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="flex flex-wrap items-center gap-2">
-              <span className="rounded bg-bad/15 px-1.5 py-0.5 text-[10.5px] font-semibold text-bad">IMPORTANTE</span>
-              <span className="text-[15px] font-semibold">Seguridad: revisión de arquitectura de sistemas de IA</span>
-            </span>
-            <span className="mt-0.5 block text-[13px] text-muted">
-              Superficies de ataque, técnicas, patrones de diseño seguro y checklist de revisión para LLMs, RAG, MCP y agentes.
-            </span>
-          </span>
-          <ArrowRight className="size-4 shrink-0 text-subtle group-hover:text-fg" />
-        </Link>
+      <div className="relative mx-auto max-w-6xl px-5 pt-10 pb-20 sm:px-8">
+
+        {/* ── Hero ────────────────────────────────────────────────── */}
         <section className="grid gap-12 lg:grid-cols-[1.1fr_1fr] lg:items-center">
           <div>
             <p className="font-mono text-[11px] tracking-[0.14em] text-subtle">
@@ -61,9 +46,9 @@ export default function HomePage() {
               </span>
             </h1>
             <p className="mt-5 max-w-xl text-[16px] leading-relaxed text-muted">
-              Un mapa interactivo del stack moderno de IA: qué hace cada pieza, de qué depende, cómo se
-              ve en código y qué pasa cuando la tocas. Con labs que calculan de verdad, no animaciones
-              guionizadas.
+              Un mapa interactivo del stack moderno: tokenización, embeddings, RAG, tool calling,
+              agentes y producción. Labs que calculan de verdad, diagramas de arquitectura de
+              referencia y rutas de aprendizaje ordenadas por prerrequisitos.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Button asChild variant="primary" size="lg">
@@ -91,46 +76,82 @@ export default function HomePage() {
           <StackPreview />
         </section>
 
-        <section className="mt-20 grid gap-4 md:grid-cols-3">
+        {/* ── Stats bar ───────────────────────────────────────────── */}
+        <div className="mt-14 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <Stat value={String(WRITTEN_COUNT)} label="conceptos publicados" color="var(--l0)" />
+          <Stat value={String(labsReady)}     label="labs interactivos"   color="var(--l2)" />
+          <Stat value={String(CASES.length)}  label="casos de uso"        color="var(--l6)" />
+          <Stat value={String(ARCHITECTURES.length)} label="arquitecturas de referencia" color="var(--l4)" />
+        </div>
+
+        {/* ── Features ────────────────────────────────────────────── */}
+        <section className="mt-10 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <Feature
             to="/labs"
             icon={FlaskConical}
             title="Labs que calculan"
             color="var(--l2)"
-            text={`Tokenizadores reales, softmax real, embeddings reales en tu navegador. ${labsReady} de ${LABS.length} labs disponibles.`}
+            text={`Tokenizadores reales, softmax real, embeddings en tu navegador. ${labsReady} de ${LABS.length} disponibles.`}
+          />
+          <Feature
+            to="/architectures"
+            icon={LayoutTemplate}
+            title="Arquitecturas"
+            color="var(--l4)"
+            text={`${ARCHITECTURES.length} patrones de implementación con diagramas interactivos: RAG, agentes, producción y más.`}
           />
           <Feature
             to="/cases"
             icon={Briefcase}
             title="Casos de uso"
             color="var(--l6)"
-            text={`${CASES.length} sistemas reales (soporte con RAG, agente de código, facturas, copiloto MCP…) con un laboratorio: cambia la arquitectura y mira qué pasa.`}
+            text={`${CASES.length} sistemas reales con laboratorio: cambia componentes y ve qué impacto tiene en la arquitectura.`}
           />
           <Feature
             to="/paths"
             icon={Route}
             title="Rutas de aprendizaje"
-            color="var(--l4)"
+            color="var(--l5)"
             text="Recorridos ordenados por prerrequisitos: cómo piensa un LLM, tu primer RAG, de chatbot a agente…"
           />
         </section>
 
-        <section className="mt-16">
-          <Card className="grid gap-6 p-6 md:grid-cols-[auto_1fr] md:items-center">
-            <Sparkles className="size-6 text-accent" />
+        {/* ── Atlas status ────────────────────────────────────────── */}
+        <section className="mt-14">
+          <Card className="grid gap-6 p-6 md:grid-cols-[auto_1fr] md:items-start">
+            <Sparkles className="mt-0.5 size-5 text-accent" />
             <div>
-              <SectionLabel>Estado del atlas</SectionLabel>
+              <SectionLabel>Qué cubre el atlas</SectionLabel>
               <p className="mt-2 text-[14px] leading-relaxed text-muted">
-                <b className="text-fg">{WRITTEN_COUNT}</b> de {CONCEPTS.length} conceptos publicados (capa
-                Fundamentos completa), <b className="text-fg">{CASES.length}</b> casos de uso con laboratorio y un
-                catálogo de <b className="text-fg">{TOOLS.length}</b> herramientas. Los conceptos pendientes ya están
-                en el mapa con sus relaciones, marcados como <span className="font-mono text-[12px]">pronto</span>.
-                Cada contenido indica cuándo se revisó y en qué fuentes se basa.
+                <b className="text-fg">{WRITTEN_COUNT}</b> de {CONCEPTS.length} conceptos publicados abarcando las{' '}
+                <b className="text-fg">8 capas</b> del stack moderno de IA: desde tokenización y sampling hasta
+                guardrails y observabilidad en producción. La capa de <b className="text-fg">Fundamentos</b> está
+                completa. <b className="text-fg">{CASES.length}</b> casos de uso con laboratorio,{' '}
+                <b className="text-fg">{TOOLS.length}</b> herramientas catalogadas y{' '}
+                <b className="text-fg">{ARCHITECTURES.length}</b> patrones de arquitectura con diagramas de referencia.
+              </p>
+              <p className="mt-2 text-[13.5px] text-subtle">
+                Los conceptos pendientes ya aparecen en el mapa con sus relaciones marcados como{' '}
+                <span className="font-mono text-[12px]">pronto</span>. Todo el contenido indica fecha de revisión y fuentes.
               </p>
             </div>
           </Card>
         </section>
       </div>
+    </div>
+  )
+}
+
+// ─── Sub-components ──────────────────────────────────────────────
+
+function Stat({ value, label, color }: { value: string; label: string; color: string }) {
+  return (
+    <div
+      className="rounded-2xl border border-border bg-surface px-5 py-4"
+      style={{ borderLeftColor: color, borderLeftWidth: 3 }}
+    >
+      <p className="text-2xl font-bold tracking-tight" style={{ color }}>{value}</p>
+      <p className="mt-0.5 text-[12.5px] text-muted">{label}</p>
     </div>
   )
 }
