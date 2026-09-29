@@ -12,7 +12,9 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>AI Atlas</title>
     <script>
-      // Decode path encoded by public/404.html (SPA routing on GitHub Pages)
+      // Decode path encoded by public/404.html (SPA routing on GitHub Pages).
+      // l.pathname at decode time is the base (/AI-Atlas/ or /), so we prepend
+      // it to restore the full path React Router expects with its basename.
       ;(function (l) {
         if (l.search[1] === '/') {
           var decoded = l.search
@@ -21,10 +23,11 @@
             .map(function (s) {
               return s.replace(/~and~/g, '&')
             })
+          var base = l.pathname.replace(/\/$/, '') // e.g. '/AI-Atlas' or ''
           window.history.replaceState(
             null,
             null,
-            decoded[0] + (decoded[1] ? '&' + decoded[1] : '') + l.hash,
+            base + decoded[0] + (decoded[1] ? '&' + decoded[1] : '') + l.hash,
           )
         }
       })(window.location)
