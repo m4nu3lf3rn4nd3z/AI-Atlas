@@ -59,11 +59,12 @@ export const LABS: readonly LabInfo[] = [
   {
     id: 'rag',
     title: 'Pipeline RAG',
-    short: 'Indexa un corpus, consulta y compara recuperación vectorial, BM25 e híbrida.',
+    short: 'Recorre un pipeline RAG completo: BM25, denso, híbrido, filtro, re-ranking, umbral y evaluación.',
     concept: 'rag',
-    reality: 'mixed',
-    realityNote: 'Recuperación real; re-ranking precomputado.',
+    reality: 'real',
+    realityNote: 'Recuperación real (BM25 y embeddings e5); puntuaciones reales de bge-reranker-v2-m3, precalculadas para las preguntas de ejemplo.',
     phase: 2,
+    Component: lazy(() => import('./rag/RagLab')),
   },
   {
     id: 'vram',

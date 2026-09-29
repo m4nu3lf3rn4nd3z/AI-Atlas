@@ -1,0 +1,67 @@
+<Term id="rag">RAG</Term> (*Retrieval-Augmented Generation*) consiste en buscar la información relevante en tus propios datos y meterla en el prompt, para que el modelo responda con ella en lugar de con lo que recuerda de su entrenamiento. Es la forma más habitual de conectar un LLM con conocimiento privado, cambiante o que necesita citarse.
+
+<Diagram name="rag-pipeline" caption="La indexación se hace una vez (y al cambiar los documentos); la recuperación, en cada pregunta." />
+
+## Cuándo usarlo
+
+| Situación | Mejor opción |
+|---|---|
+| Conocimiento que cambia, es privado o hay que citar | RAG |
+| Todo el conocimiento cabe holgadamente en el contexto | Meterlo entero en el prompt, con <Concept id="inference-optimizations">prompt caching</Concept> |
+| Cambiar el estilo, el formato o una habilidad del modelo | <Concept id="fine-tuning">Fine-tuning</Concept> o mejores instrucciones |
+| Datos estructurados (ventas, stock) | Consultas SQL o una API como herramienta, no embeddings |
+
+Con bases de conocimiento pequeñas (del orden de cientos de miles de tokens) pegarlo todo en el prompt puede ser más simple y dar mejores resultados. RAG compensa cuando el volumen crece, cuando los datos cambian a menudo o cuando cada usuario solo puede ver una parte.
+
+## Recuperar: palabras, significado o ambos
+
+| | BM25 (léxica) | Densa (embeddings) |
+|---|---|---|
+| Qué compara | Palabras en común, ponderadas por lo raras que son | Significado: vectores cercanos |
+| Brilla con | Códigos, nombres propios, cifras, jerga exacta | Paráfrasis, sinónimos, otros idiomas |
+| Falla con | «caja rota» frente a «paquete dañado» | Identificadores raros, negaciones |
+| Coste | Índice invertido, barato | Modelo de <Concept id="embedding-models">embeddings</Concept> + <Concept id="vector-databases">base vectorial</Concept> |
+
+La <Concept id="hybrid-search">búsqueda híbrida</Concept> ejecuta las dos y fusiona los rankings, normalmente con *Reciprocal Rank Fusion*: cada documento suma 1 / (60 + posición) en cada lista. No es gratis: si una de las dos listas aporta mucho ruido, la fusión puede empeorar a la mejor de ellas. En el lab lo puedes ver con datos reales.
+
+## Re-ranking y filtros
+
+- **<Concept id="reranking">Re-ranking</Concept>**: se recuperan 20–50 candidatos con un método rápido y un *cross-encoder* los reordena leyendo pregunta y fragmento juntos. Es más preciso y más lento, por eso solo se aplica a unos pocos.
+- **Filtros por metadatos**: fecha, versión, idioma, producto y, sobre todo, **permisos**. Una política obsoleta que sigue en el índice acaba en el prompt y el modelo puede usarla.
+- **Umbral de relevancia**: si ningún fragmento es suficientemente relevante, es mejor no pasar contexto y que el modelo diga que no lo sabe.
+
+<Callout type="warning" title="Los permisos se aplican en la búsqueda, no en el prompt">
+Si un usuario no puede ver un documento, ese documento no debe llegar a su prompt. Pedirle al modelo que «no revele» información que ya está en su contexto no es un control de seguridad. Y cualquier documento recuperado puede contener instrucciones escritas por un tercero: es la vía de la <Concept id="prompt-injection">prompt injection indirecta</Concept>.
+</Callout>
+
+## Generar: el prompt importa
+
+- Instrucciones explícitas: responder solo con las fuentes, citarlas y decir «no lo sé» cuando no estén.
+- Fuentes numeradas, con título y fecha, para que las citas sean verificables.
+- La pregunta al final, después de los documentos.
+- Pocas fuentes y buenas: más contexto no siempre ayuda (ver *lost in the middle* en <Concept id="context-window">ventana de contexto</Concept>).
+
+Algunas APIs, como la de Claude, pueden devolver citas estructuradas que señalan el fragmento exacto de cada documento que respalda cada frase de la respuesta.
+
+## Por qué falla un RAG
+
+| Fallo | Síntoma | Remedio |
+|---|---|---|
+| La recuperación no encuentra el fragmento | «No lo sé» o respuesta inventada | Híbrida, mejores chunks, contextual retrieval |
+| Encuentra un fragmento parecido pero incorrecto | Respuesta segura y equivocada | Re-ranking, umbral, metadatos |
+| Documentos contradictorios u obsoletos | Mezcla datos de versiones distintas | Filtros por fecha o versión, limpiar el índice |
+| El modelo ignora el contexto | Responde con lo que «sabe» | Instrucciones más claras, citas obligatorias |
+| Contenido malicioso en un documento | El modelo sigue instrucciones del documento | Tratar el contexto como datos no fiables |
+
+## Evaluar
+
+Un RAG se evalúa en dos mitades, con un conjunto de preguntas reales y sus respuestas o fragmentos correctos:
+
+- **Recuperación**: ¿llega el fragmento correcto al prompt? (*recall@k*, MRR, nDCG).
+- **Generación**: ¿la respuesta se apoya en las fuentes (*faithfulness*), responde a la pregunta y cita bien? Suele medirse con un LLM como juez; librerías como Ragas lo automatizan.
+
+<Callout type="insight">
+RAG no elimina las <Term id="hallucination">alucinaciones</Term>: las reduce cuando la recuperación funciona. Si el fragmento correcto no llega al prompt, ningún modelo puede responder bien. Por eso se empieza midiendo la recuperación.
+</Callout>
+
+En la pestaña **Lab** puedes recorrer un pipeline completo sobre una base de conocimiento de ejemplo: comparar recuperadores, activar el filtro y el re-ranking, poner un umbral y ver cómo cambian las métricas.

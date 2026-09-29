@@ -5,6 +5,7 @@ import { LostInMiddleDiagram } from './LostInMiddle'
 import { MoeDiagram } from './Moe'
 import { PipelineDiagram } from './Pipeline'
 import { QuantGridDiagram } from './QuantGrid'
+import { RagPipelineDiagram } from './RagPipeline'
 import { ReasoningDiagram } from './Reasoning'
 import { TrainingDiagram } from './Training'
 
@@ -18,4 +19,5 @@ export const DIAGRAMS = {
   reasoning: ReasoningDiagram,
   'embedding-space': EmbeddingSpaceDiagram,
   'quant-grid': QuantGridDiagram,
+  'rag-pipeline': RagPipelineDiagram,
 }
