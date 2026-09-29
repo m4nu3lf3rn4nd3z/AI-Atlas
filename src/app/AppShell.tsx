@@ -1,4 +1,4 @@
-import { BookText, Briefcase, FlaskConical, Gauge, LayoutTemplate, Moon, Network, Route, Search, ShieldAlert, Sun, Wrench } from 'lucide-react'
+import { BookOpenCheck, BookText, Briefcase, FlaskConical, Gauge, LayoutTemplate, Moon, Network, Route, Search, ShieldAlert, Sun, Wrench } from 'lucide-react'
 import { lazy, Suspense, useEffect } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router'
 import { Kbd, Tooltip } from '@/components/ui/primitives'
@@ -16,7 +16,8 @@ const NAV = [
   { to: '/tools',         label: 'Herramientas',   icon: Wrench },
   { to: '/security',      label: 'Seguridad',      icon: ShieldAlert },
   { to: '/glossary',      label: 'Glosario',       icon: BookText },
-  { to: '/progress',      label: 'Progreso',       icon: Gauge },
+  { to: '/quiz',          label: 'Quiz',           icon: BookOpenCheck },
+  { to: '/progress',     label: 'Progreso',       icon: Gauge },
 ]
 
 const CommandPalette = lazy(() =>

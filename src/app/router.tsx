@@ -19,6 +19,7 @@ const ArchitecturesPage = lazy(() => import('@/features/architectures/Architectu
 const ArchitecturePage = lazy(() => import('@/features/architectures/ArchitecturePage'))
 const GlossaryPage = lazy(() => import('@/features/glossary/GlossaryPage'))
 const ProgressPage = lazy(() => import('@/features/progress/ProgressPage'))
+const QuizPage = lazy(() => import('@/features/quiz/QuizPage'))
 const NotFound = lazy(() => import('./NotFound'))
 
 // BASE_URL = Vite 'base' option: '/AI-Atlas/' on GitHub Pages, '/' in dev.
@@ -44,6 +45,7 @@ export const router = createBrowserRouter(
         { path: 'architectures/:archId', element: <ArchitecturePage /> },
         { path: 'glossary', element: <GlossaryPage /> },
         { path: 'progress', element: <ProgressPage /> },
+        { path: 'quiz', element: <QuizPage /> },
         { path: '*', element: <NotFound /> },
       ],
     },
