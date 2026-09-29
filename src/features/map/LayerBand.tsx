@@ -52,22 +52,33 @@ export function LayerBand({ layer, onOpen }: { layer: Layer; onOpen: (id: string
           <span className="block truncate text-[12.5px] text-subtle">{layer.subtitle}</span>
         </span>
         <span className="hidden shrink-0 flex-col items-end gap-1 sm:flex">
-          <span className="font-mono text-[10.5px] text-subtle">
-            {learned}/{written} aprendidos
-            {written < concepts.length && ` · ${concepts.length - written} pronto`}
-          </span>
-          <span className="flex h-1.5 w-40 gap-[2px]" aria-hidden>
-            {concepts.map((c) => {
-              const style = PROGRESS_STYLE[progressState(c.id, progress[c.id])]
-              return (
-                <span
-                  key={c.id}
-                  className="flex-1 rounded-full"
-                  style={{ background: style.background, border: style.border }}
-                />
-              )
-            })}
-          </span>
+          {collapsed ? (
+            <span
+              className="rounded-md border px-2 py-0.5 font-mono text-[11px] text-subtle"
+              style={{ borderColor: `color-mix(in oklab, ${layer.color} 22%, transparent)` }}
+            >
+              {concepts.length} conceptos
+            </span>
+          ) : (
+            <>
+              <span className="font-mono text-[10.5px] text-subtle">
+                {learned}/{written} aprendidos
+                {written < concepts.length && ` · ${concepts.length - written} pronto`}
+              </span>
+              <span className="flex h-1.5 w-40 gap-[2px]" aria-hidden>
+                {concepts.map((c) => {
+                  const style = PROGRESS_STYLE[progressState(c.id, progress[c.id])]
+                  return (
+                    <span
+                      key={c.id}
+                      className="flex-1 rounded-full"
+                      style={{ background: style.background, border: style.border }}
+                    />
+                  )
+                })}
+              </span>
+            </>
+          )}
         </span>
         <ChevronDown
           className={cn('size-4 shrink-0 text-subtle transition-transform duration-200', collapsed && '-rotate-90')}

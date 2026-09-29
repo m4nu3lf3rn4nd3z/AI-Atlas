@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { EdgeType } from '@/content/graph'
+import { LAYERS } from '@/content/layers'
 import type { LayerId } from '@/content/schema'
 
 /* Ephemeral + preference UI state. Selection lives in the URL, not here. */
@@ -37,7 +38,7 @@ export const useUi = create<UiState>()(
       drawerWidth: 560,
       hovered: null,
       hiddenEdgeTypes: [],
-      collapsedLayers: [],
+      collapsedLayers: LAYERS.map((l) => l.id),
       showLines: true,
       prereqMode: false,
       paletteOpen: false,
@@ -72,7 +73,7 @@ export const useUi = create<UiState>()(
     }),
     {
       name: 'atlas-ui',
-      version: 2,
+      version: 3,
       partialize: (s) => ({
         theme: s.theme,
         drawerWidth: s.drawerWidth,
@@ -81,7 +82,12 @@ export const useUi = create<UiState>()(
         showLines: s.showLines,
         prereqMode: s.prereqMode,
       }),
-      migrate: (persisted) => persisted as UiState,
+      migrate: (persisted, version) => {
+        const s = persisted as UiState
+        // v2→v3: default changed from all-expanded to all-collapsed
+        if (version < 3) s.collapsedLayers = LAYERS.map((l) => l.id)
+        return s
+      },
     },
   ),
 )
